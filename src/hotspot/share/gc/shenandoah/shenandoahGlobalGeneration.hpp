@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2019, Red Hat, Inc. All rights reserved.
+ * Copyright (c) 2001, 2018, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -22,21 +22,18 @@
  *
  */
 
-#ifndef SHARE_GC_SHENANDOAH_SHENANDOAHOOPCLOSURES_INLINE_HPP
-#define SHARE_GC_SHENANDOAH_SHENANDOAHOOPCLOSURES_INLINE_HPP
+#ifndef SHARE_VM_GC_SHENANDOAH_SHENANDOAHGLOBALGENERATION_HPP
+#define SHARE_VM_GC_SHENANDOAH_SHENANDOAHGLOBALGENERATION_HPP
 
-#include "gc/shenandoah/shenandoahHeap.inline.hpp"
-#include "gc/shenandoah/shenandoahConcurrentMark.inline.hpp"
 #include "gc/shenandoah/shenandoahGeneration.hpp"
 
-template<class T, GenerationMode GENERATION, UpdateRefsMode UPDATE_REFS, StringDedupMode STRING_DEDUP>
-inline void ShenandoahMarkRefsSuperClosure::work(T *p) {
-  ShenandoahConcurrentMark::mark_through_ref<T, GENERATION, UPDATE_REFS, STRING_DEDUP>(p, _heap, _queue, _mark_context);
-}
+// A "generation" that represents the whole heap.
+class ShenandoahGlobalGeneration : public ShenandoahGeneration {
+public:
+  ShenandoahGlobalGeneration() : ShenandoahGeneration(GLOBAL) { }
 
-template <class T>
-inline void ShenandoahUpdateHeapRefsClosure::do_oop_work(T* p) {
-  _heap->maybe_update_with_forwarded(p);
-}
+  virtual void op_final_mark();
+};
 
-#endif // SHARE_GC_SHENANDOAH_SHENANDOAHOOPCLOSURES_INLINE_HPP
+#endif // SHARE_VM_GC_SHENANDOAH_SHENANDOAHGLOBALGENERATION_HPP
+

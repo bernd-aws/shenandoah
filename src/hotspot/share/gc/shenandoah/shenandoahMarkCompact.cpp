@@ -32,6 +32,7 @@
 #include "gc/shenandoah/shenandoahConcurrentRoots.hpp"
 #include "gc/shenandoah/shenandoahCollectionSet.hpp"
 #include "gc/shenandoah/shenandoahFreeSet.hpp"
+#include "gc/shenandoah/shenandoahGeneration.hpp"
 #include "gc/shenandoah/shenandoahPhaseTimings.hpp"
 #include "gc/shenandoah/shenandoahMarkCompact.hpp"
 #include "gc/shenandoah/shenandoahHeapRegionSet.hpp"
@@ -113,14 +114,14 @@ void ShenandoahMarkCompact::do_it(GCCause::Cause gc_cause) {
 
     // b. Cancel concurrent mark, if in progress
     if (heap->is_concurrent_mark_in_progress()) {
-      heap->concurrent_mark()->cancel();
+      heap->global_generation()->concurrent_mark()->cancel();
       heap->set_concurrent_mark_in_progress(false);
     }
     assert(!heap->is_concurrent_mark_in_progress(), "sanity");
 
     // c. Update roots if this full GC is due to evac-oom, which may carry from-space pointers in roots.
     if (has_forwarded_objects) {
-      heap->concurrent_mark()->update_roots(ShenandoahPhaseTimings::full_gc_update_roots);
+      heap->global_generation()->concurrent_mark()->update_roots(ShenandoahPhaseTimings::full_gc_update_roots);
     }
 
     // d. Reset the bitmaps for new marking
@@ -239,8 +240,6 @@ void ShenandoahMarkCompact::phase1_mark_heap() {
   ShenandoahPrepareForMarkClosure cl;
   heap->heap_region_iterate(&cl);
 
-  ShenandoahConcurrentMark* cm = heap->concurrent_mark();
-
   heap->set_process_references(heap->heuristics()->can_process_references());
   heap->set_unload_classes(heap->heuristics()->can_unload_classes());
 
@@ -250,8 +249,9 @@ void ShenandoahMarkCompact::phase1_mark_heap() {
   rp->setup_policy(true); // forcefully purge all soft references
   rp->set_active_mt_degree(heap->workers()->active_workers());
 
-  cm->mark_roots(ShenandoahPhaseTimings::full_gc_scan_roots);
-  cm->finish_mark_from_roots(/* full_gc = */ true);
+  ShenandoahConcurrentMark* scm = heap->global_generation()->concurrent_mark();
+  scm->mark_roots(GLOBAL, ShenandoahPhaseTimings::full_gc_scan_roots);
+  scm->finish_mark_from_roots(/* full_gc = */ true);
   heap->mark_complete_marking_context();
   heap->parallel_cleaning(true /* full_gc */);
 }

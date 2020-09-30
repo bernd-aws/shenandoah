@@ -245,7 +245,7 @@ private:
 
   HeapWord* volatile _update_watermark;
 
-  ShenandoahGenerationAffiliation _affiliation;
+  ShenandoahRegionAffiliation _affiliation;
 
 public:
   ShenandoahHeapRegion(HeapWord* start, size_t index, bool committed);
@@ -388,11 +388,11 @@ public:
   inline void set_update_watermark(HeapWord* w);
   inline void set_update_watermark_at_safepoint(HeapWord* w);
 
-  ShenandoahGenerationAffiliation affiliation() const {
+  ShenandoahRegionAffiliation affiliation() const {
     return _affiliation;
   }
 
-  void set_affiliation(ShenandoahGenerationAffiliation new_affiliation);
+  void set_affiliation(ShenandoahRegionAffiliation new_affiliation);
 
 private:
   void do_commit();

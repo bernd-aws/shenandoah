@@ -100,7 +100,8 @@ private:
   shenandoah_padding(2);
 
   bool check_cancellation_or_degen(ShenandoahHeap::ShenandoahDegenPoint point);
-  void service_concurrent_normal_cycle(GCCause::Cause cause);
+  void service_concurrent_global_cycle(GCCause::Cause cause);
+  void service_concurrent_young_cycle(GCCause::Cause cause);
   void service_stw_full_cycle(GCCause::Cause cause);
   void service_stw_degenerated_cycle(GCCause::Cause cause, ShenandoahHeap::ShenandoahDegenPoint point);
   void service_uncommit(double shrink_before, size_t shrink_until);

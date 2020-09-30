@@ -25,15 +25,37 @@
 #ifndef SHARE_VM_GC_SHENANDOAH_SHENANDOAHGENERATION_HPP
 #define SHARE_VM_GC_SHENANDOAH_SHENANDOAHGENERATION_HPP
 
-class ShenandoahGeneration {
+#include "memory/allocation.hpp"
+#include "gc/shenandoah/shenandoahLock.hpp"
+#include "gc/shenandoah/shenandoahMarkingContext.hpp"
+#include "gc/shenandoah/shenandoahConcurrentMark.hpp"
+#include "gc/shenandoah/shenandoahOopClosures.hpp"
+
+class ShenandoahGeneration : public CHeapObj<mtGC> {
+private:
+  GenerationMode const _generation_mode;
+  ShenandoahConcurrentMark* const _scm;
 public:
-  ShenandoahGeneration();
-};
+  ShenandoahGeneration(GenerationMode generation_mode) :
+    _generation_mode(generation_mode),
+    _scm(new ShenandoahConcurrentMark(generation_mode)) {
+  }
 
-class ShenandoahYoungGeneration : public ShenandoahGeneration {
-};
+  inline GenerationMode generation_mode() const { return _generation_mode; }
 
-class ShenandoahOldGeneration : public ShenandoahGeneration {
+  inline ShenandoahConcurrentMark* concurrent_mark() const { return _scm; }
+
+  // Entry methods to normally STW GC operations. These set up logging, monitoring
+  // and workers for net VM operation
+  void entry_init_mark();
+  void entry_mark();
+  void entry_final_mark();
+
+  void op_init_mark();
+  virtual void op_final_mark() = 0;
+
+private:
+  void op_mark();
 };
 
 #endif // SHARE_VM_GC_SHENANDOAH_SHENANDOAHGENERATION_HPP

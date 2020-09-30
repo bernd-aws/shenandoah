@@ -261,8 +261,8 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
   assert(ShenandoahThreadLocalData::is_evac_allowed(thread), "must be enclosed in oom-evac scope");
 
   size_t size = p->size();
-  ShenandoahGenerationAffiliation target_gen = heap_region_containing(p)->affiliation();
-  if (target_gen == ShenandoahGenerationAffiliation::YOUNG_GENERATION) {
+  ShenandoahRegionAffiliation target_gen = heap_region_containing(p)->affiliation();
+  if (target_gen == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
     markWord mark = p->mark();
     if (mark.is_marked()) {
       // Already forwarded.
@@ -270,7 +270,7 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
     } else {
       if (mark.age() > InitialTenuringThreshold) {
         //tty->print_cr("promoting object: " PTR_FORMAT, p2i(p));
-        //target_gen = OLD_GEN;
+        //target_gen = ShenandoahRegionAffiliation::OLD_GENERATION;
       }
     }
   }
@@ -286,7 +286,7 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
         copy = NULL;
   } else {
 #endif
-    if (UseTLAB && target_gen == ShenandoahGenerationAffiliation::YOUNG_GENERATION) {
+    if (UseTLAB && target_gen == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
       copy = allocate_from_gclab(thread, size);
     }
     if (copy == NULL) {
@@ -317,7 +317,7 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
     shenandoah_assert_correct(NULL, copy_val);
 
     // Increment age in young copies
-    if (target_gen == ShenandoahGenerationAffiliation::YOUNG_GENERATION) {
+    if (target_gen == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
       copy_val->incr_age();
     }
 

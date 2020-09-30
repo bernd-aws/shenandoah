@@ -146,13 +146,13 @@ HeapWord* ShenandoahFreeSet::try_allocate_in(ShenandoahHeapRegion* r, Shenandoah
     return NULL;
   }
 
-  if (r->affiliation() == ShenandoahGenerationAffiliation::FREE) {
+  try_recycle_trashed(r);
+
+  if (r->affiliation() == ShenandoahRegionAffiliation::FREE) {
     r->set_affiliation(req.affiliation());
   } else if (r->affiliation() != req.affiliation()) {
     return NULL;
   }
-
-  try_recycle_trashed(r);
 
   in_new_region = r->is_empty();
 
@@ -301,6 +301,8 @@ HeapWord* ShenandoahFreeSet::allocate_contiguous(ShenandoahAllocRequest& req) {
     } else {
       r->make_humongous_cont();
     }
+
+    r->set_affiliation(OLD_GENERATION); // Keep all humongous objects in old gen.
 
     // Trailing region may be non-full, record the remainder there
     size_t used_words;

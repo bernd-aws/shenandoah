@@ -28,6 +28,7 @@
 #include "gc/shenandoah/shenandoahCollectorPolicy.hpp"
 #include "gc/shenandoah/shenandoahControlThread.hpp"
 #include "gc/shenandoah/shenandoahFreeSet.hpp"
+#include "gc/shenandoah/shenandoahGeneration.hpp"
 #include "gc/shenandoah/shenandoahPhaseTimings.hpp"
 #include "gc/shenandoah/shenandoahHeap.inline.hpp"
 #include "gc/shenandoah/shenandoahMonitoringSupport.hpp"
@@ -36,6 +37,7 @@
 #include "gc/shenandoah/shenandoahVMOperations.hpp"
 #include "gc/shenandoah/shenandoahWorkerPolicy.hpp"
 #include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
+#include "gc/shenandoah/mode/shenandoahMode.hpp"
 #include "memory/iterator.hpp"
 #include "memory/universe.hpp"
 #include "runtime/atomic.hpp"
@@ -206,7 +208,13 @@ void ShenandoahControlThread::run_service() {
 
       switch (mode) {
         case concurrent_normal:
-          service_concurrent_normal_cycle(cause);
+          if (heap->mode()->is_generational()) {
+            // TODO: Only young collections for now.
+            // We'll add old collections later.
+            service_concurrent_young_cycle(cause);
+          } else {
+            service_concurrent_global_cycle(cause);
+          }
           break;
         case stw_degenerated:
           service_stw_degenerated_cycle(cause, degen_point);
@@ -349,7 +357,7 @@ bool ShenandoahControlThread::check_soft_max_changed() const {
   return false;
 }
 
-void ShenandoahControlThread::service_concurrent_normal_cycle(GCCause::Cause cause) {
+void ShenandoahControlThread::service_concurrent_global_cycle(GCCause::Cause cause) {
   // Normal cycle goes via all concurrent phases. If allocation failure (af) happens during
   // any of the concurrent phases, it first degrades to Degenerated GC and completes GC there.
   // If second allocation failure happens during Degenerated GC cycle (for example, when GC
@@ -386,6 +394,7 @@ void ShenandoahControlThread::service_concurrent_normal_cycle(GCCause::Cause cau
   //                                      Full GC  --------------------------/
   //
   ShenandoahHeap* heap = ShenandoahHeap::heap();
+  ShenandoahGeneration* generation = heap->global_generation();
 
   if (check_cancellation_or_degen(ShenandoahHeap::_degenerated_outside_cycle)) return;
 
@@ -398,17 +407,102 @@ void ShenandoahControlThread::service_concurrent_normal_cycle(GCCause::Cause cau
   heap->entry_reset();
 
   // Start initial mark under STW
-  heap->vmop_entry_init_mark();
+  heap->vmop_entry_init_mark(generation);
 
   // Continue concurrent mark
-  heap->entry_mark();
+  generation->entry_mark();
   if (check_cancellation_or_degen(ShenandoahHeap::_degenerated_mark)) return;
 
   // If not cancelled, can try to concurrently pre-clean
   heap->entry_preclean();
 
   // Complete marking under STW, and start evacuation
-  heap->vmop_entry_final_mark();
+  heap->vmop_entry_final_mark(generation);
+
+  // Process weak roots that might still point to regions that would be broken by cleanup
+  if (heap->is_concurrent_weak_root_in_progress()) {
+    heap->entry_weak_roots();
+  }
+
+  // Final mark might have reclaimed some immediate garbage, kick cleanup to reclaim
+  // the space. This would be the last action if there is nothing to evacuate.
+  heap->entry_cleanup_early();
+
+  {
+    ShenandoahHeapLocker locker(heap->lock());
+    heap->free_set()->log_status();
+  }
+
+  // Perform concurrent class unloading
+  if (heap->is_concurrent_weak_root_in_progress()) {
+    heap->entry_class_unloading();
+  }
+
+  // Processing strong roots
+  // This may be skipped if there is nothing to update/evacuate.
+  // If so, strong_root_in_progress would be unset.
+  if (heap->is_concurrent_strong_root_in_progress()) {
+    heap->entry_strong_roots();
+  }
+
+  // Continue the cycle with evacuation and optional update-refs.
+  // This may be skipped if there is nothing to evacuate.
+  // If so, evac_in_progress would be unset by collection set preparation code.
+  if (heap->is_evacuation_in_progress()) {
+    // Concurrently evacuate
+    heap->entry_evac();
+    if (check_cancellation_or_degen(ShenandoahHeap::_degenerated_evac)) return;
+
+    // Perform update-refs phase.
+    heap->vmop_entry_init_updaterefs();
+    heap->entry_updaterefs();
+    if (check_cancellation_or_degen(ShenandoahHeap::_degenerated_updaterefs)) return;
+
+    heap->vmop_entry_final_updaterefs();
+
+    // Update references freed up collection set, kick the cleanup to reclaim the space.
+    heap->entry_cleanup_complete();
+  } else {
+    // Concurrent weak/strong root flags are unset concurrently. We depend on updateref GC safepoints
+    // to ensure the changes are visible to all mutators before gc cycle is completed.
+    // In case of no evacuation, updateref GC safepoints are skipped. Therefore, we will need
+    // to perform thread handshake to ensure their consistences.
+    heap->entry_rendezvous_roots();
+  }
+
+  // Cycle is complete
+  heap->heuristics()->record_success_concurrent();
+  heap->shenandoah_policy()->record_success_concurrent();
+}
+
+// Young cycle goes through all concurrent phases like the global cycle described above,
+// but collects only the young generation.
+void ShenandoahControlThread::service_concurrent_young_cycle(GCCause::Cause cause) {
+  ShenandoahHeap* heap = ShenandoahHeap::heap();
+  ShenandoahGeneration* generation = heap->young_generation();
+
+  if (check_cancellation_or_degen(ShenandoahHeap::_degenerated_outside_cycle)) return;
+
+  GCIdMark gc_id_mark;
+  ShenandoahGCSession session(cause);
+
+  TraceCollectorStats tcs(heap->monitoring_support()->concurrent_collection_counters());
+
+  // Reset for upcoming marking
+  heap->entry_reset();
+
+  // Start initial mark under STW
+  heap->vmop_entry_init_mark(generation);
+
+  // Continue concurrent mark
+  generation->entry_mark();
+  if (check_cancellation_or_degen(ShenandoahHeap::_degenerated_mark)) return;
+
+  // If not cancelled, can try to concurrently pre-clean
+  heap->entry_preclean();
+
+  // Complete marking under STW, and start evacuation
+  heap->vmop_entry_final_mark(generation);
 
   // Process weak roots that might still point to regions that would be broken by cleanup
   if (heap->is_concurrent_weak_root_in_progress()) {
