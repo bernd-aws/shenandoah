@@ -30,6 +30,7 @@
 #include "gc/shenandoah/shenandoahHeapRegion.inline.hpp"
 #include "gc/shenandoah/shenandoahMarkingContext.inline.hpp"
 #include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
+#include "gc/shenandoah/mode/shenandoahMode.hpp"
 #include "logging/log.hpp"
 #include "logging/logTag.hpp"
 #include "runtime/globals_extension.hpp"
@@ -96,6 +97,10 @@ void ShenandoahHeuristics::choose_collection_set(ShenandoahCollectionSet* collec
 
   for (size_t i = 0; i < num_regions; i++) {
     ShenandoahHeapRegion* region = heap->get_region(i);
+    if (heap->mode()->is_generational() && region->affiliation() != ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+      // TODO: "generational" means young collection only for now.
+      continue;
+    }
 
     size_t garbage = region->garbage();
     total_garbage += garbage;
@@ -116,6 +121,9 @@ void ShenandoahHeuristics::choose_collection_set(ShenandoahCollectionSet* collec
         cand_idx++;
       }
     } else if (region->is_humongous_start()) {
+      // We never allocate humongous objects in young gen. (TODO: revisit this).
+      assert(region->affiliation() != ShenandoahRegionAffiliation::YOUNG_GENERATION, "Humongous object found in young gen.");
+
       // Reclaim humongous regions here, and count them as the immediate garbage
 #ifdef ASSERT
       bool reg_live = region->has_live();
