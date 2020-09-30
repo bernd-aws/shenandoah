@@ -26,11 +26,12 @@
 #define SHARE_GC_SHENANDOAH_SHENANDOAHALLOCREQUEST_HPP
 
 #include "memory/allocation.hpp"
+#include "gc/shenandoah/shenandoahGeneration.hpp"
 
-enum ShenandoahGeneration {
-  YOUNG_GEN,
-  OLD_GEN,
-  NO_GEN
+enum ShenandoahGenerationAffiliation {
+  FREE,
+  YOUNG_GENERATION,
+  OLD_GENERATION
 };
 
 class ShenandoahAllocRequest : StackObj {
@@ -64,14 +65,14 @@ private:
   size_t _requested_size;
   size_t _actual_size;
   Type _alloc_type;
-  ShenandoahGeneration const _generation;
+  ShenandoahGenerationAffiliation const _affiliation;
 #ifdef ASSERT
   bool _actual_size_set;
 #endif
 
-  ShenandoahAllocRequest(size_t _min_size, size_t _requested_size, Type _alloc_type, ShenandoahGeneration generation) :
+  ShenandoahAllocRequest(size_t _min_size, size_t _requested_size, Type _alloc_type, ShenandoahGenerationAffiliation affiliation) :
           _min_size(_min_size), _requested_size(_requested_size),
-          _actual_size(0), _alloc_type(_alloc_type), _generation(generation)
+          _actual_size(0), _alloc_type(_alloc_type), _affiliation(affiliation)
 #ifdef ASSERT
           , _actual_size_set(false)
 #endif
@@ -79,19 +80,19 @@ private:
 
 public:
   static inline ShenandoahAllocRequest for_tlab(size_t min_size, size_t requested_size) {
-    return ShenandoahAllocRequest(min_size, requested_size, _alloc_tlab, YOUNG_GEN);
+    return ShenandoahAllocRequest(min_size, requested_size, _alloc_tlab, ShenandoahGenerationAffiliation::YOUNG_GENERATION);
   }
 
   static inline ShenandoahAllocRequest for_gclab(size_t min_size, size_t requested_size) {
-    return ShenandoahAllocRequest(min_size, requested_size, _alloc_gclab, YOUNG_GEN);
+    return ShenandoahAllocRequest(min_size, requested_size, _alloc_gclab, ShenandoahGenerationAffiliation::YOUNG_GENERATION);
   }
 
-  static inline ShenandoahAllocRequest for_shared_gc(size_t requested_size, ShenandoahGeneration generation) {
-    return ShenandoahAllocRequest(0, requested_size, _alloc_shared_gc, generation);
+  static inline ShenandoahAllocRequest for_shared_gc(size_t requested_size, ShenandoahGenerationAffiliation affiliation) {
+    return ShenandoahAllocRequest(0, requested_size, _alloc_shared_gc, affiliation);
   }
 
   static inline ShenandoahAllocRequest for_shared(size_t requested_size) {
-    return ShenandoahAllocRequest(0, requested_size, _alloc_shared, YOUNG_GEN);
+    return ShenandoahAllocRequest(0, requested_size, _alloc_shared, ShenandoahGenerationAffiliation::YOUNG_GENERATION);
   }
 
   inline size_t size() {
@@ -166,8 +167,8 @@ public:
     }
   }
 
-  ShenandoahGeneration generation() const {
-    return _generation;
+  ShenandoahGenerationAffiliation affiliation() const {
+    return _affiliation;
   }
 };
 

@@ -146,9 +146,9 @@ HeapWord* ShenandoahFreeSet::try_allocate_in(ShenandoahHeapRegion* r, Shenandoah
     return NULL;
   }
 
-  if (r->generation() == NO_GEN) {
-    r->set_generation(req.generation());
-  } else if (r->generation() != req.generation()) {
+  if (r->affiliation() == ShenandoahGenerationAffiliation::FREE) {
+    r->set_affiliation(req.affiliation());
+  } else if (r->affiliation() != req.affiliation()) {
     return NULL;
   }
 
