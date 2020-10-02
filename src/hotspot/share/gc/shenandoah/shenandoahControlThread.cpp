@@ -36,6 +36,7 @@
 #include "gc/shenandoah/shenandoahUtils.hpp"
 #include "gc/shenandoah/shenandoahVMOperations.hpp"
 #include "gc/shenandoah/shenandoahWorkerPolicy.hpp"
+#include "gc/shenandoah/shenandoahYoungGeneration.hpp"
 #include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
 #include "gc/shenandoah/mode/shenandoahMode.hpp"
 #include "memory/iterator.hpp"
@@ -479,7 +480,7 @@ void ShenandoahControlThread::service_concurrent_global_cycle(GCCause::Cause cau
 // but collects only the young generation.
 void ShenandoahControlThread::service_concurrent_young_cycle(GCCause::Cause cause) {
   ShenandoahHeap* heap = ShenandoahHeap::heap();
-  ShenandoahGeneration* generation = heap->young_generation();
+  ShenandoahYoungGeneration* generation = heap->young_generation();
 
   if (check_cancellation_or_degen(ShenandoahHeap::_degenerated_outside_cycle)) return;
 

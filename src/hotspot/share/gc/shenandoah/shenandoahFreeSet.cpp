@@ -28,6 +28,7 @@
 #include "gc/shenandoah/shenandoahHeap.inline.hpp"
 #include "gc/shenandoah/shenandoahHeapRegionSet.hpp"
 #include "gc/shenandoah/shenandoahMarkingContext.inline.hpp"
+#include "gc/shenandoah/shenandoahYoungGeneration.hpp"
 #include "logging/logStream.hpp"
 #include "runtime/orderAccess.hpp"
 
@@ -184,6 +185,10 @@ HeapWord* ShenandoahFreeSet::try_allocate_in(ShenandoahHeapRegion* r, Shenandoah
     if (req.is_gc_alloc()) {
       r->set_update_watermark(r->top());
     }
+
+    if (r->affiliation() == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+      _heap->young_generation()->increase_used(size * HeapWordSize);
+    }
   }
 
   if (result == NULL || has_no_alloc_capacity(r)) {
@@ -199,6 +204,9 @@ HeapWord* ShenandoahFreeSet::try_allocate_in(ShenandoahHeapRegion* r, Shenandoah
       size_t waste = r->free();
       if (waste > 0) {
         increase_used(waste);
+        if (r->affiliation() == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+          _heap->young_generation()->increase_used(waste);
+        }
         _heap->notify_mutator_alloc_words(waste >> LogHeapWordSize, true);
       }
     }
@@ -322,6 +330,10 @@ HeapWord* ShenandoahFreeSet::allocate_contiguous(ShenandoahAllocRequest& req) {
   // marked used in the free set.
   increase_used(ShenandoahHeapRegion::region_size_bytes() * num);
 
+  if (req.affiliation() == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+    _heap->young_generation()->increase_used(ShenandoahHeapRegion::region_size_bytes() * num);
+  }
+
   if (remainder != 0) {
     // Record this remainder as allocation waste
     _heap->notify_mutator_alloc_words(ShenandoahHeapRegion::region_size_words() - remainder, true);
@@ -356,6 +368,9 @@ bool ShenandoahFreeSet::has_no_alloc_capacity(ShenandoahHeapRegion *r) {
 
 void ShenandoahFreeSet::try_recycle_trashed(ShenandoahHeapRegion *r) {
   if (r->is_trash()) {
+    if (r->affiliation() == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+      _heap->young_generation()->decrease_used(r->used());
+    }
     _heap->decrease_used(r->used());
     r->recycle();
   }

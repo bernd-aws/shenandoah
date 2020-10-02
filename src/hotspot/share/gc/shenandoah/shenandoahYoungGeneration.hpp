@@ -28,10 +28,30 @@
 #include "gc/shenandoah/shenandoahGeneration.hpp"
 
 class ShenandoahYoungGeneration : public ShenandoahGeneration {
+private:
+  size_t _affiliated_region_count;
+  size_t _used;
+
 public:
-  ShenandoahYoungGeneration() : ShenandoahGeneration(YOUNG) { }
+  ShenandoahYoungGeneration();
+
+  void increment_affiliated_region_count();
+  void decrement_affiliated_region_count();
+
+  void increase_used(size_t bytes);
+  void decrease_used(size_t bytes);
+
+private:
+  virtual size_t configured_capacity() const;
+
+public:
+  virtual size_t capacity() const;
+  virtual size_t used() const { return _used; }
+  virtual size_t available() const;
 
   virtual void op_final_mark();
+
+  void promote_all();
 };
 
 #endif // SHARE_VM_GC_SHENANDOAH_SHENANDOAHYOUNGGENERATION_HPP

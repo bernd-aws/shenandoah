@@ -45,6 +45,11 @@ public:
 
   inline ShenandoahConcurrentMark* concurrent_mark() const { return _scm; }
 
+public:
+  virtual size_t capacity() const = 0;
+  virtual size_t used() const = 0;
+  virtual size_t available() const = 0;
+
   // Entry methods to normally STW GC operations. These set up logging, monitoring
   // and workers for net VM operation
   void entry_init_mark();

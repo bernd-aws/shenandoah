@@ -32,7 +32,13 @@ class ShenandoahGlobalGeneration : public ShenandoahGeneration {
 public:
   ShenandoahGlobalGeneration() : ShenandoahGeneration(GLOBAL) { }
 
+public:
+  virtual size_t capacity() const;
+  virtual size_t used() const;
+  virtual size_t available() const;
+
   virtual void op_final_mark();
+
 };
 
 #endif // SHARE_VM_GC_SHENANDOAH_SHENANDOAHGLOBALGENERATION_HPP

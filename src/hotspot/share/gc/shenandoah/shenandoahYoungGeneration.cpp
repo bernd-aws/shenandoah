@@ -33,6 +33,68 @@
 #include "gc/shenandoah/shenandoahYoungGeneration.hpp"
 #include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
 
+ShenandoahYoungGeneration::ShenandoahYoungGeneration() : ShenandoahGeneration(YOUNG),
+  _affiliated_region_count(0),
+  _used(0) {
+}
+
+void ShenandoahYoungGeneration::increment_affiliated_region_count() {
+  _affiliated_region_count++;
+}
+
+void ShenandoahYoungGeneration::decrement_affiliated_region_count() {
+  _affiliated_region_count--;
+}
+
+void ShenandoahYoungGeneration::increase_used(size_t bytes) {
+  _used += bytes;
+}
+
+void ShenandoahYoungGeneration::decrease_used(size_t bytes) {
+  assert(used() >= bytes, "cannot reduce bytes used by young generation below zero");
+  _used -= bytes;
+}
+
+// There are three JVM parameters for setting young gen capacity:
+//    NewSize, MaxNewSize, NewRatio.
+//
+// If only NewSize is set, it assigns a fixed size and the other two parameters are ignored.
+// Otherwise NewRatio applies.
+//
+// If NewSize is set in any combination, it provides a lower bound.
+//
+// If MaxNewSize is set it provides an upper bound.
+// If this bound is smaller than NewSize, it supersedes,
+// resulting in a fixed size given by MaxNewSize.
+size_t ShenandoahYoungGeneration::configured_capacity() const {
+  size_t capacity = ShenandoahHeap::heap()->soft_max_capacity();
+  if (FLAG_IS_CMDLINE(NewSize) && !FLAG_IS_CMDLINE(MaxNewSize) && !FLAG_IS_CMDLINE(NewRatio)) {
+    capacity = MIN2(NewSize, capacity);
+  } else {
+    capacity /= NewRatio + 1;
+    if (FLAG_IS_CMDLINE(NewSize)) {
+      capacity = MAX2(NewSize, capacity);
+    }
+    if (FLAG_IS_CMDLINE(MaxNewSize)) {
+      capacity = MIN2(MaxNewSize, capacity);
+    }
+  }
+  return capacity;
+}
+
+size_t ShenandoahYoungGeneration::capacity() const {
+  size_t used_regions_capacity = _affiliated_region_count * ShenandoahHeapRegion::region_size_bytes();
+
+  assert(used() <= used_regions_capacity, "Must not use more than we have - used: " SIZE_FORMAT ", used_regions_capacity: " SIZE_FORMAT,
+                                          used_regions_capacity, used());
+
+  return MAX2(configured_capacity(), used_regions_capacity);
+}
+
+size_t ShenandoahYoungGeneration::available() const {
+  return MIN2(capacity() - used(), ShenandoahHeap::heap()->free_set()->available());
+}
+
 // TODO: This is almost the same code as in ShenandoahGlobalGeneration for now, to be further differentiated.
 void ShenandoahYoungGeneration::op_final_mark() {
   ShenandoahHeap* heap = ShenandoahHeap::heap();
@@ -150,4 +212,18 @@ void ShenandoahYoungGeneration::op_final_mark() {
     concurrent_mark()->cancel();
     heap->set_concurrent_mark_in_progress(false);
   }
+}
+
+void ShenandoahYoungGeneration::promote_all() {
+  _used = 0;
+
+  ShenandoahHeap* heap = ShenandoahHeap::heap();
+  for (size_t index = 0; index < heap->num_regions(); index++) {
+    ShenandoahHeapRegion* region = heap->get_region(index);
+    if (region->affiliation() == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+      region->set_affiliation(ShenandoahRegionAffiliation::OLD_GENERATION);
+    }
+  }
+
+  assert(_affiliated_region_count == 0, "young generation must not have affiliated regions after reset");
 }

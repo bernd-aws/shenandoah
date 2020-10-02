@@ -23,6 +23,7 @@
  */
 
 #include "gc/shenandoah/shenandoahConcurrentRoots.hpp"
+#include "gc/shenandoah/shenandoahFreeSet.hpp"
 #include "gc/shenandoah/shenandoahHeap.hpp"
 #include "gc/shenandoah/shenandoahConcurrentMark.hpp"
 #include "gc/shenandoah/shenandoahMonitoringSupport.hpp"
@@ -152,3 +153,4 @@ void ShenandoahGeneration::op_init_mark() {
 void ShenandoahGeneration::op_mark() {
   concurrent_mark()->mark_from_roots();
 }
+

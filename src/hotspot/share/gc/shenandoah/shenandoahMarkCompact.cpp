@@ -45,6 +45,7 @@
 #include "gc/shenandoah/shenandoahVerifier.hpp"
 #include "gc/shenandoah/shenandoahVMOperations.hpp"
 #include "gc/shenandoah/shenandoahWorkerPolicy.hpp"
+#include "gc/shenandoah/shenandoahYoungGeneration.hpp"
 #include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
 #include "memory/metaspace.hpp"
 #include "memory/universe.hpp"
@@ -1021,6 +1022,8 @@ void ShenandoahMarkCompact::phase4_compact_objects(ShenandoahHeapRegionSet** wor
 
     heap->collection_set()->clear();
     heap->free_set()->rebuild();
+
+    heap->young_generation()->promote_all();
   }
 
   heap->clear_cancelled_gc();

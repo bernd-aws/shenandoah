@@ -33,6 +33,18 @@
 #include "gc/shenandoah/shenandoahGlobalGeneration.hpp"
 #include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
 
+size_t ShenandoahGlobalGeneration::capacity() const {
+  return ShenandoahHeap::heap()->soft_max_capacity();
+}
+
+size_t ShenandoahGlobalGeneration::used() const {
+  return ShenandoahHeap::heap()->free_set()->used();
+}
+
+size_t ShenandoahGlobalGeneration::available() const {
+  return ShenandoahHeap::heap()->free_set()->available();
+}
+
 void ShenandoahGlobalGeneration::op_final_mark() {
   ShenandoahHeap* heap = ShenandoahHeap::heap();
 

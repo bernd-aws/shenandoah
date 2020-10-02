@@ -29,6 +29,8 @@
 #include "gc/shenandoah/shenandoahHeap.inline.hpp"
 #include "gc/shenandoah/shenandoahHeapRegion.hpp"
 #include "gc/shenandoah/shenandoahMarkingContext.inline.hpp"
+#include "gc/shenandoah/shenandoahGeneration.hpp"
+#include "gc/shenandoah/shenandoahYoungGeneration.hpp"
 #include "gc/shared/space.inline.hpp"
 #include "jfr/jfrEvents.hpp"
 #include "memory/iterator.inline.hpp"
@@ -718,12 +720,17 @@ void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affil
   if (_affiliation == new_affiliation) {
     return;
   }
+  ShenandoahHeap* heap = ShenandoahHeap::heap();
+  if (_affiliation == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+      heap->young_generation()->decrement_affiliated_region_count();
+  }
   CardTable* card_table = ShenandoahBarrierSet::barrier_set()->card_table();
   switch (new_affiliation) {
     case FREE:
       card_table->clear_MemRegion(MemRegion(_bottom, _end));
       break;
     case YOUNG_GENERATION:
+      heap->young_generation()->increment_affiliated_region_count();
       break;
     case OLD_GENERATION:
       if (_affiliation == YOUNG_GENERATION) {

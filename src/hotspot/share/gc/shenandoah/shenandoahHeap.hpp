@@ -49,6 +49,7 @@ class ShenandoahControlThread;
 class ShenandoahGCSession;
 class ShenandoahGCStateResetter;
 class ShenandoahGeneration;
+class ShenandoahYoungGeneration;
 class ShenandoahHeuristics;
 class ShenandoahMarkingContext;
 class ShenandoahMarkCompact;
@@ -65,6 +66,7 @@ class ShenandoahObjToScanQueueSet;
 class ShenandoahPacer;
 class ShenandoahVerifier;
 class ShenandoahWorkGang;
+class ShenandoahYoungGeneration;
 class VMStructs;
 
 // Used for buffering per-region liveness data.
@@ -435,7 +437,7 @@ private:
 // ---------- GC subsystems
 //
 private:
-  ShenandoahGeneration*      _young_generation;
+  ShenandoahYoungGeneration* _young_generation;
   ShenandoahGeneration*      _global_generation;
   ShenandoahControlThread*   _control_thread;
   ShenandoahCollectorPolicy* _shenandoah_policy;
@@ -452,7 +454,7 @@ private:
   ShenandoahMarkCompact*     full_gc()                 { return _full_gc;           }
 
 public:
-  ShenandoahGeneration*      young_generation()  const { return _young_generation;  }
+  ShenandoahYoungGeneration* young_generation()  const { return _young_generation;  }
   ShenandoahGeneration*      global_generation() const { return _global_generation; }
   ShenandoahCollectorPolicy* shenandoah_policy() const { return _shenandoah_policy; }
   ShenandoahMode*            mode()              const { return _gc_mode;           }
