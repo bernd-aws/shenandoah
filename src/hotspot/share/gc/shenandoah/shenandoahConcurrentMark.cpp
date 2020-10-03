@@ -45,6 +45,7 @@
 #include "gc/shenandoah/shenandoahPhaseTimings.hpp"
 #include "gc/shenandoah/shenandoahTaskqueue.inline.hpp"
 #include "gc/shenandoah/shenandoahUtils.hpp"
+#include "gc/shenandoah/shenandoahScanRemembered.inline.hpp"
 
 #include "memory/iterator.inline.hpp"
 #include "memory/metaspace.hpp"
@@ -86,11 +87,13 @@ class ShenandoahInitMarkRootsTask : public AbstractGangTask {
 private:
   ShenandoahConcurrentMark* const _scm;
   ShenandoahRootScanner* const _rp;
+  uint const _workers;
 public:
-  ShenandoahInitMarkRootsTask(ShenandoahConcurrentMark* scm, ShenandoahRootScanner* rp) :
+    ShenandoahInitMarkRootsTask(ShenandoahConcurrentMark* scm, ShenandoahRootScanner* rp, uint worker_count) :
     AbstractGangTask("Shenandoah Init Mark Roots"),
     _scm(scm),
-    _rp(rp) {
+    _rp(rp),
+    _workers(worker_count) {
   }
 
   void work(uint worker_id) {
@@ -350,12 +353,12 @@ void ShenandoahConcurrentMark::mark_roots(GenerationMode generation, ShenandoahP
   task_queues()->reserve(nworkers);
 
   if (heap->has_forwarded_objects()) {
-    ShenandoahInitMarkRootsTask<RESOLVE> mark_roots(this, &root_proc);
+    ShenandoahInitMarkRootsTask<RESOLVE> mark_roots(this, &root_proc, nworkers);
     workers->run_task(&mark_roots);
   } else {
     // No need to update references, which means the heap is stable.
     // Can save time not walking through forwarding pointers.
-    ShenandoahInitMarkRootsTask<NONE> mark_roots(this, &root_proc);
+    ShenandoahInitMarkRootsTask<NONE> mark_roots(this, &root_proc, nworkers);
     workers->run_task(&mark_roots);
   }
 }

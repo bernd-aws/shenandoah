@@ -23,8 +23,10 @@
  *
  */
 
-#include "shenandoahScanRemembered.hpp"
-
+#include "gc/shenandoah/shenandoahScanRemembered.hpp"
+#include "gc/shenandoah/shenandoahHeapRegion.hpp"
+#include "gc/shenandoah/shenandoahHeap.hpp"
+#include "gc/shenandoah/shenandoahHeap.inline.hpp"
 
 ShenandoahDirectCardMarkRememberedSet::ShenandoahDirectCardMarkRememberedSet(
     CardTable *card_table, size_t count)
@@ -157,175 +159,7 @@ uint8_t ShenandoahCardCluster<RememberedSet>::getCrossingObjectStart(uint32_t ca
 
 #else
 
-// This implementation of services is slow but "sure" (in theory).
-// Significant performance improvement is planned, with not a huge
-// amount of further effort.
+// Relevant services are implemented in lined.
 
-template <class RememberedSet>
-bool ShenandoahCardCluster<RememberedSet>::hasObject(uint32_t card_no) {
-  HeapWord *addr = _rs->addrForCardNo(card_no);
-  ShenandoahHeap *heap = ShenandoahHeap::heap();
-  ShenandoahHeapRegion *region = heap->heap_region_containing(addr);
-  HeapWord *obj = region->block_start(addr);
-
-  assert(obj != NULL, "Object cannot be null");
-  if (obj >= addr)
-    return true;
-  else {
-    HeapWord *end_addr = addr + CardTable::card_size_in_words;
-    obj += oop(obj)->size();
-    if (obj < end_addr)
-      return true;
-    else
-      return false;
-  }
-}
-
-template <class RememberedSet>
-uint32_t ShenandoahCardCluster<RememberedSet>::getFirstStart(uint32_t card_no)
-{
-  HeapWord *addr = _rs->addrForCardNo(card_no);
-  ShenandoahHeap *heap = ShenandoahHeap::heap();
-  ShenandoahHeapRegion *region = heap->heap_region_containing(addr);
-  HeapWord *obj = region->block_start(addr);
-
-  assert(obj != NULL, "Object cannot be null");
-  if (obj >= addr)
-    return obj - addr;
-  else {
-    HeapWord *end_addr = addr + CardTable::card_size_in_words;
-    obj += oop(obj)->size();
-    assert(obj < end_addr, "Object start address must be before its block end");
-    return obj - addr;
-  }
-}
-
-template <class RememberedSet>
-uint32_t ShenandoahCardCluster<RememberedSet>::getLastStart(uint32_t card_no) {
-  HeapWord *addr = _rs->addrForCardNo(card_no);
-  HeapWord *end_addr = addr + CardTable::card_size_in_words;
-  ShenandoahHeap *heap = ShenandoahHeap::heap();
-  ShenandoahHeapRegion *region = heap->heap_region_containing(addr);
-  HeapWord *obj = region->block_start(addr);
-
-  assert(obj != NULL, "Object cannot be null");
-
-  HeapWord *end_obj = obj + oop(obj)->size();
-  while (end_obj < end_addr) {
-    obj = end_obj;
-    end_obj = obj + oop(obj)->size();
-  }
-
-  assert(obj >= addr, "Object out of range.");
-  return obj - addr;
-}
-
-template <class RememberedSet>
-uint32_t ShenandoahCardCluster<RememberedSet>::getCrossingObjectStart(uint32_t card_no) {
-  HeapWord *addr = _rs->addrForCardNo(card_no);
-  uint32_t cluster_no =
-      card_no / ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
-  HeapWord *cluster_addr = _rs->addrForCardNo(cluster_no * CardsPerCluster);
-
-  HeapWord *end_addr = addr + CardTable::card_size_in_words;
-  ShenandoahHeap *heap = ShenandoahHeap::heap();
-  ShenandoahHeapRegion *region = heap->heap_region_containing(addr);
-  HeapWord *obj = region->block_start(addr);
-
-  if (obj > cluster_addr)
-    return obj - cluster_addr;
-  else
-    return 0x7fff;
-}
 #endif
 
-
-template <typename RememberedSet>
-template <typename ClosureType>
-void ShenandoahScanRemembered<RememberedSet>::processClusters(
-    uint32_t first_cluster, uint32_t count, ClosureType *oops) {
-
-  // Unlike traditional Shenandoah marking, the old-gen resident
-  // objects that are examined as part of the remembered set are not
-  // themselves marked.  Each such object will be scanned only once.
-  // Any young-gen objects referenced from the remembered set will
-  // be marked and then subsequently scanned.
-
-  while (count-- > 0) {
-
-    uint32_t card_no = first_cluster *
-	ShenandoahCardCluster<ShenandoahBufferWithSATBRememberedSet>::CardsPerCluster;
-    uint32_t end_card_no = card_no +
-	ShenandoahCardCluster<ShenandoahBufferWithSATBRememberedSet>::CardsPerCluster;
-
-    while (card_no < end_card_no) {
-      if (_scc->isCardDirty(card_no)) {
-        if (_scc->hasObject(card_no)) {
-          // Scan all objects that start within this card region.
-          uint32_t start_offset = _scc->getFirstStart(card_no);
-          HeapWord *p = _scc->getAddrForCard(card_no);
-          HeapWord *endp = p + CardTable::card_size_in_words;
-          p += start_offset;
-
-          while (p < endp) {
-            oop obj = oop(p);
-
-            // Future TODO:
-	    // For improved efficiency, we might want to give
-            // special handling of obj->is_objArray().  In
-            // particular, in that case, we might want to divide the
-            // effort for scanning of a very long object array
-            // between multiple threads.
-            if (obj->is_objArray()) {
-              objArrayOop array = objArrayOop(obj);
-	      int len = array->length();
-	      array->oop_iterate_range(oops, 0, len);
-	    } else
-	      oops->do_oop(&obj);
-	    p += obj->size();
-	  }
-	  // p either points to start of next card region, or to
-	  // the next object that needs to be scanned, which may
-	  // reside in some successor card region.
-	  card_no = _scc->cardAtAddress(p);
-	} else {
-          // otherwise, this card will have been scanned during
-          // scan of a previous cluster.
-          card_no++;
-        }
-      } else if (_scc->hasObject(card_no)) {
-        // Scan the last object that starts within this card memory if
-        // it spans at least one dirty card within this cluster or
-        // if it reaches into the next cluster. 
-        uint32_t start_offset = _scc->getFirstStart(card_no);
-        HeapWord *p = _scc->getAddrForCard(card_no) + start_offset;
-        oop obj = oop(p);
-        HeapWord *nextp = p + obj->size();
-        uint32_t last_card = _scc->cardAtAddress(nextp);
-
-        bool reaches_next_cluster = (last_card > end_card_no);
-        bool spans_dirty_within_this_cluster = false;
-        if (!reaches_next_cluster) {
-          int span_card;
-          for (span_card = card_no+1; span_card < end_card_no; span_card++)
-            if (_scc->isCardDirty(span_card)) {
-              spans_dirty_within_this_cluster = true;
-	      break;
-	    }
-	}
-	if (reaches_next_cluster || spans_dirty_within_this_cluster) {
-	  if (obj->is_objArray()) {
-	    objArrayOop array = objArrayOop(obj);
-	    int len = array->length();
-	    array->oop_iterate_range(oops, 0, len);
-          } else
-            oops->do_oop(&obj);
-	}
-	// Increment card_no to account for the spanning object,
-	// even if we didn't scan it.
-	card_no = _scc->cardAtAddress(end_card_no);
-      } else
-	card_no++;
-    }
-  }
-}

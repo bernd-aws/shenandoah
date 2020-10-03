@@ -33,6 +33,7 @@
 #include "gc/shared/memAllocator.hpp"
 #include "gc/shared/plab.hpp"
 
+#include "gc/shenandoah/shenandoahScanRemembered.hpp"
 #include "gc/shenandoah/shenandoahBarrierSet.hpp"
 #include "gc/shenandoah/shenandoahCardTable.hpp"
 #include "gc/shenandoah/shenandoahClosures.inline.hpp"
@@ -71,6 +72,8 @@
 #include "gc/shenandoah/mode/shenandoahIUMode.hpp"
 #include "gc/shenandoah/mode/shenandoahPassiveMode.hpp"
 #include "gc/shenandoah/mode/shenandoahSATBMode.hpp"
+#include "gc/shenandoah/shenandoahScanRemembered.inline.hpp"
+
 #if INCLUDE_JFR
 #include "gc/shenandoah/shenandoahJfrSupport.hpp"
 #endif
@@ -209,6 +212,12 @@ jint ShenandoahHeap::initialize() {
   //
   // After reserving the Java heap, create the card table, barriers, and workers, in dependency order
   //
+  if (mode()->is_generational()) {
+    ShenandoahDirectCardMarkRememberedSet *rs;
+    size_t card_count = ShenandoahBarrierSet::card_table()->cards_required(heap_rs.size() / HeapWordSize) - 1;
+    rs = new ShenandoahDirectCardMarkRememberedSet(ShenandoahBarrierSet::card_table(), card_count);
+    _card_scan = new ShenandoahScanRemembered<ShenandoahDirectCardMarkRememberedSet>(rs);
+  }
   BarrierSet::set_barrier_set(new ShenandoahBarrierSet(this, _heap_region));
 
   _workers = new ShenandoahWorkGang("Shenandoah GC Threads", _max_workers,
@@ -512,7 +521,8 @@ ShenandoahHeap::ShenandoahHeap(ShenandoahCollectorPolicy* policy) :
   _bitmap_region_special(false),
   _aux_bitmap_region_special(false),
   _liveness_cache(NULL),
-  _collection_set(NULL)
+  _collection_set(NULL),
+  _card_scan(NULL)
 {
 }
 

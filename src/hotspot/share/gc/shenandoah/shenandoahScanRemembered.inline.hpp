@@ -326,10 +326,8 @@ template <typename ClosureType>
 inline void 
 ShenandoahScanRemembered<RememberedSet>::process_clusters(uint32_t first_cluster, uint32_t count, ClosureType *oops) {
 
-  // Unlike traditional Shenandoah marking, the old-gen resident
-  // objects that are examined as part of the remembered set are not
-  // themselves marked.  Each such object will be scanned only once.
-  // Any young-gen objects referenced from the remembered set will
+  // Unlike traditional Shenandoah marking, the old-gen resident objects that are examined as part of the remembered set are not
+  // themselves marked.  Each such object will be scanned only once.  Any young-gen objects referenced from the remembered set will
   // be marked and then subsequently scanned.
 
   while (count-- > 0) {
@@ -351,10 +349,8 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint32_t first_cluster
            oop obj = oop(p);
 
            // Future TODO:
-	   // For improved efficiency, we might want to give
-	   // special handling of obj->is_objArray().  In
-	   // particular, in that case, we might want to divide the
-	   // effort for scanning of a very long object array
+	   // For improved efficiency, we might want to give special handling of obj->is_objArray().  In
+	   // particular, in that case, we might want to divide the effort for scanning of a very long object array
 	   // between multiple threads.
 	   if (obj->is_objArray()) {
              objArrayOop array = objArrayOop(obj);
@@ -364,19 +360,16 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint32_t first_cluster
              oops->do_oop(&obj);
 	   p += obj->size();
 	 }
-	 // p either points to start of next card region, or to
-	 // the next object that needs to be scanned, which may
+	 // p either points to start of next card region, or to the next object that needs to be scanned, which may
 	 // reside in some successor card region.
 	 card_no = _scc->cardNoForAddr(p);
        } else {
-         // otherwise, this card will have been scanned during
-         // scan of a previous cluster.
+         // otherwise, this card will have been scanned during scan of a previous cluster.
 	 card_no++;
        }
      } else if (_scc->hasObject(card_no)) {
-       // Scan the last object that starts within this card memory if
-       // it spans at least one dirty card within this cluster or
-       // if it reaches into the next cluster. 
+       // Scan the last object that starts within this card memory if it spans at least one dirty card within this cluster
+       // or if it reaches into the next cluster. 
        uint32_t start_offset = _scc->getFirstStart(card_no);
        HeapWord *p = _scc->addrForCardNo(card_no) + start_offset;
        oop obj = oop(p);
@@ -401,8 +394,7 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint32_t first_cluster
 	 } else
 	   oops->do_oop(&obj);
        }
-       // Increment card_no to account for the spanning object,
-       // even if we didn't scan it.
+       // Increment card_no to account for the spanning object, even if we didn't scan it.
        card_no = last_card;
      } else
        card_no++;
