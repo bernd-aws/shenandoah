@@ -24,10 +24,7 @@
 
 #include "precompiled.hpp"
 #include "gc/shenandoah/shenandoahConcurrentRoots.hpp"
-#include "gc/shenandoah/heuristics/shenandoahAdaptiveHeuristics.hpp"
-#include "gc/shenandoah/heuristics/shenandoahAggressiveHeuristics.hpp"
-#include "gc/shenandoah/heuristics/shenandoahCompactHeuristics.hpp"
-#include "gc/shenandoah/heuristics/shenandoahStaticHeuristics.hpp"
+#include "gc/shenandoah/heuristics/shenandoahGenerationalHeuristics.hpp"
 #include "gc/shenandoah/mode/shenandoahGenerationalMode.hpp"
 #include "logging/log.hpp"
 #include "logging/logTag.hpp"
@@ -50,19 +47,29 @@ void ShenandoahGenerationalMode::initialize_flags() const {
 }
 
 ShenandoahHeuristics* ShenandoahGenerationalMode::initialize_heuristics() const {
-  if (ShenandoahGCHeuristics != NULL) {
-    if (strcmp(ShenandoahGCHeuristics, "aggressive") == 0) {
-      return new ShenandoahAggressiveHeuristics();
-    } else if (strcmp(ShenandoahGCHeuristics, "static") == 0) {
-      return new ShenandoahStaticHeuristics();
-    } else if (strcmp(ShenandoahGCHeuristics, "adaptive") == 0) {
-      return new ShenandoahAdaptiveHeuristics();
-    } else if (strcmp(ShenandoahGCHeuristics, "compact") == 0) {
-      return new ShenandoahCompactHeuristics();
-    } else {
-      vm_exit_during_initialization("Unknown -XX:ShenandoahGCHeuristics option");
-    }
-  }
-  ShouldNotReachHere();
-  return NULL;
+  // HEY! If we had a better abstraction over the concepts of 'capacity'
+  // and 'available' we could leverage it to get some re-use out of the
+  // existing heuristics.
+  
+  // if (ShenandoahGCHeuristics != NULL) {
+  //   if (strcmp(ShenandoahGCHeuristics, "aggressive") == 0) {
+  //     return new ShenandoahAggressiveHeuristics();
+  //   } else if (strcmp(ShenandoahGCHeuristics, "static") == 0) {
+  //     return new ShenandoahStaticHeuristics();
+  //   } else if (strcmp(ShenandoahGCHeuristics, "adaptive") == 0) {
+  //     return new ShenandoahAdaptiveHeuristics();
+  //   } else if (strcmp(ShenandoahGCHeuristics, "compact") == 0) {
+  //     return new ShenandoahCompactHeuristics();
+  //   } else {
+  //     vm_exit_during_initialization("Unknown -XX:ShenandoahGCHeuristics option");
+  //   }
+  // }
+
+  // HEY! Eventually we will want separate heuristics for old and young
+  // generations. Or perhaps we'll need to have 'should_start_gc' return the
+  // type/generation to run a GC on.
+  ShenandoahHeap *heap = ShenandoahHeap::heap();
+  ShenandoahGeneration *generation = heap->young_generation();
+  assert(generation != nullptr, "Expected generation to be initialized here.");
+  return new ShenandoahGenerationalHeuristics(generation);
 }
