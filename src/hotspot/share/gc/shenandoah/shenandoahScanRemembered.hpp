@@ -246,7 +246,7 @@ private:
   ShenandoahHeap *_heap;
   CardTable *_card_table;
   uint32_t _card_shift;
-  size_t _card_count;
+  size_t _total_card_count;
   uint32_t _cluster_count;
   HeapWord *_whole_heap_base;
   HeapWord *_whole_heap_end;
@@ -257,7 +257,7 @@ private:
 
 public:
   // count is the number of cards represented by the card table.
-  ShenandoahDirectCardMarkRememberedSet(CardTable *card_table, size_t count);
+  ShenandoahDirectCardMarkRememberedSet(CardTable *card_table, size_t total_card_count);
   ~ShenandoahDirectCardMarkRememberedSet();
 
   uint32_t cardNoForAddr(HeapWord *p);
@@ -1035,5 +1035,7 @@ public:
   //  cross one of these boundaries.
 
 };
+
+typedef ShenandoahScanRemembered<ShenandoahDirectCardMarkRememberedSet> RememberedScanner;
 
 #endif // SHARE_GC_SHENANDOAH_SHENANDOAHSCANREMEMBERED_HPP

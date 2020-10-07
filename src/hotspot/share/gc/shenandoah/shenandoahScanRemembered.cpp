@@ -23,50 +23,46 @@
  *
  */
 
-#include "gc/shenandoah/shenandoahScanRemembered.hpp"
 #include "gc/shenandoah/shenandoahHeapRegion.hpp"
+#include "gc/shenandoah/shenandoahScanRemembered.hpp"
 #include "gc/shenandoah/shenandoahHeap.hpp"
 #include "gc/shenandoah/shenandoahHeap.inline.hpp"
+#include "gc/shenandoah/shenandoahHeapRegion.hpp"
+#include "gc/shenandoah/shenandoahHeapRegion.inline.hpp"
 
-ShenandoahDirectCardMarkRememberedSet::ShenandoahDirectCardMarkRememberedSet(
-    CardTable *card_table, size_t count)
-{
+ShenandoahDirectCardMarkRememberedSet::ShenandoahDirectCardMarkRememberedSet(CardTable *card_table, size_t total_card_count) {
   _heap = ShenandoahHeap::heap();
   _card_table = card_table;
-  _card_count = count;
-  _cluster_count = (
-      _card_count /
-      ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster);
+  _total_card_count = total_card_count;
+  _cluster_count = (total_card_count / ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster);
   _card_shift = CardTable::card_shift;
 
   _whole_heap_base = _card_table->addr_for(_byte_map);
-  _whole_heap_end = _card_table->addr_for(_byte_map + _card_count);
+  _whole_heap_end = _card_table->addr_for(_byte_map + total_card_count);
 
 
   _byte_map = _card_table->byte_for_index(0);
   _byte_map_base = _byte_map - (uintptr_t(_whole_heap_base) >> _card_shift);
 
-  _overreach_map = (uint8_t *) malloc(_card_count);
+  _overreach_map = (uint8_t *) malloc(total_card_count);
   _overreach_map_base = (_overreach_map -
 			 (uintptr_t(_whole_heap_base) >> _card_shift));
       
-  assert(_card_count % ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster == 0, "Invalid card count.");
-  assert(_card_count > 0, "Card count cannot be zero.");
+  assert(total_card_count % ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster == 0, "Invalid card count.");
+  assert(total_card_count > 0, "Card count cannot be zero.");
+  // assert(_overreach_cards != NULL);
 }
 
-ShenandoahDirectCardMarkRememberedSet::~ShenandoahDirectCardMarkRememberedSet()
-{
+ShenandoahDirectCardMarkRememberedSet::~ShenandoahDirectCardMarkRememberedSet() {
   free(_overreach_map);
 }
 
-void ShenandoahDirectCardMarkRememberedSet::initializeOverreach(
-    uint32_t first_cluster, uint32_t count) {
+void ShenandoahDirectCardMarkRememberedSet::initializeOverreach(uint32_t first_cluster, uint32_t count) {
 
   // We can make this run faster in the future by explicitly
   // unrolling the loop and doing wide writes if the compiler
   // doesn't do this for us.
-  uint32_t first_card_no =
-      first_cluster * ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster;
+  uint32_t first_card_no = first_cluster * ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster;
   uint8_t *omp = &_overreach_map[first_card_no];
   uint8_t *endp = omp + count * ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster;
   while (omp < endp)
@@ -75,18 +71,14 @@ void ShenandoahDirectCardMarkRememberedSet::initializeOverreach(
 
 void ShenandoahDirectCardMarkRememberedSet::mergeOverreach(uint32_t first_cluster, uint32_t count) {
 
-  // We can make this run faster in the future by explicitly
-  // unrolling the loop and doing wide writes if the compiler
+  // We can make this run faster in the future by explicitly unrolling the loop and doing wide writes if the compiler
   // doesn't do this for us.
-    uint32_t first_card_no = (
-      first_cluster *
-      ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster);
+  uint32_t first_card_no = first_cluster * ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster;
   uint8_t *bmp = &_byte_map[first_card_no];
   uint8_t *endp = bmp + count * ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster;
   uint8_t *omp = &_overreach_map[first_card_no];
 
-  // dirty_card is 0, clean card is 0xff
-  // if either *bmp or *omp is dirty, we need to mark it as dirty
+  // dirty_card is 0, clean card is 0xff; if either *bmp or *omp is dirty, we need to mark it as dirty
   while (bmp < endp)
     *bmp++ &= *omp++;
 }
@@ -105,26 +97,19 @@ ShenandoahBufferWithSATBRememberedSet::ShenandoahBufferWithSATBRememberedSet(siz
   _whole_heap_base = _heap->base();
   _whole_heap_end = _whole_heap_base + _card_count * 
       ShenandoahCardCluster<ShenandoahBufferWithSATBRememberedSet>::CardsPerCluster;
-
 }
 
-/* Implementation is not correct.  ShenandoahBufferWithSATBRememberedSet
- * is a placeholder for future planned improvements.
- */
+// Implementation is not correct.  ShenandoahBufferWithSATBRememberedSet is a placeholder for future planned improvements.
 ShenandoahBufferWithSATBRememberedSet::~ShenandoahBufferWithSATBRememberedSet()
 {
 }
 
-/* Implementation is not correct.  ShenandoahBufferWithSATBRememberedSet
- * is a placeholder for future planned improvements.
- */
+// Implementation is not correct.  ShenandoahBufferWithSATBRememberedSet is a placeholder for future planned improvements.
 void ShenandoahBufferWithSATBRememberedSet::initializeOverreach(
     uint32_t first_cluster, uint32_t count) {
 }
 
-/* Implementation is not correct.  ShenandoahBufferWithSATBRememberedSet
- * is a placeholder for future planned improvements.
- */
+// Implementation is not correct.  ShenandoahBufferWithSATBRememberedSet is a placeholder for future planned improvements.
 void ShenandoahBufferWithSATBRememberedSet::mergeOverreach(
     uint32_t first_cluster, uint32_t count) {
 }
@@ -156,10 +141,6 @@ uint8_t ShenandoahCardCluster<RememberedSet>::getCrossingObjectStart(uint32_t ca
   assert((object_starts[card_no] & ObjectStartsInCardRegion) == 0);
   return object_starts[card_no] * CardWordOffsetMultiplier;
 }
-
-#else
-
-// Relevant services are implemented in lined.
 
 #endif
 

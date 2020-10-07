@@ -706,10 +706,10 @@ public:
 // ---------- Generational support
 //
 private:
-  ShenandoahScanRemembered<ShenandoahDirectCardMarkRememberedSet> *_card_scan;
+  RememberedScanner* _card_scan;
 
 public:
-  inline ShenandoahScanRemembered<ShenandoahDirectCardMarkRememberedSet>* card_scan() { return _card_scan; }
+  inline RememberedScanner* card_scan() { return _card_scan; }
 
 // ---------- Helper functions
 //

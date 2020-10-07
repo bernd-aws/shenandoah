@@ -89,7 +89,8 @@ private:
   ShenandoahRootScanner* const _rp;
   uint const _workers;
 public:
-    ShenandoahInitMarkRootsTask(ShenandoahConcurrentMark* scm, ShenandoahRootScanner* rp, uint worker_count) :
+
+  ShenandoahInitMarkRootsTask(ShenandoahConcurrentMark* scm, ShenandoahRootScanner* rp, uint worker_count) :
     AbstractGangTask("Shenandoah Init Mark Roots"),
     _scm(scm),
     _rp(rp),
