@@ -50,20 +50,6 @@ ShenandoahHeuristics* ShenandoahGenerationalMode::initialize_heuristics() const 
   // HEY! If we had a better abstraction over the concepts of 'capacity'
   // and 'available' we could leverage it to get some re-use out of the
   // existing heuristics.
-  
-  // if (ShenandoahGCHeuristics != NULL) {
-  //   if (strcmp(ShenandoahGCHeuristics, "aggressive") == 0) {
-  //     return new ShenandoahAggressiveHeuristics();
-  //   } else if (strcmp(ShenandoahGCHeuristics, "static") == 0) {
-  //     return new ShenandoahStaticHeuristics();
-  //   } else if (strcmp(ShenandoahGCHeuristics, "adaptive") == 0) {
-  //     return new ShenandoahAdaptiveHeuristics();
-  //   } else if (strcmp(ShenandoahGCHeuristics, "compact") == 0) {
-  //     return new ShenandoahCompactHeuristics();
-  //   } else {
-  //     vm_exit_during_initialization("Unknown -XX:ShenandoahGCHeuristics option");
-  //   }
-  // }
 
   // HEY! Eventually we will want separate heuristics for old and young
   // generations. Or perhaps we'll need to have 'should_start_gc' return the
