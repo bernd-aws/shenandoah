@@ -121,8 +121,6 @@ void ShenandoahHeuristics::choose_collection_set(ShenandoahCollectionSet* collec
         cand_idx++;
       }
     } else if (region->is_humongous_start()) {
-      // We never allocate humongous objects in young gen. (TODO: revisit this).
-      assert(region->affiliation() != ShenandoahRegionAffiliation::YOUNG_GENERATION, "Humongous object found in young gen.");
 
       // Reclaim humongous regions here, and count them as the immediate garbage
 #ifdef ASSERT
