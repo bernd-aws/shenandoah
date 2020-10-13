@@ -247,6 +247,7 @@ private:
   HeapWord* volatile _update_watermark;
 
   ShenandoahRegionAffiliation _affiliation;
+  uint _age;
 
 public:
   ShenandoahHeapRegion(HeapWord* start, size_t index, bool committed);
@@ -394,6 +395,10 @@ public:
   }
 
   void set_affiliation(ShenandoahRegionAffiliation new_affiliation);
+
+  uint age()           { return _age; }
+  void increment_age() { if (_age < markWord::max_age) { _age++; } }
+  void reset_age()     { _age = 0; }
 
 private:
   void do_commit();

@@ -2984,6 +2984,16 @@ void ShenandoahHeap::deduplicate_string(oop str) {
   }
 }
 
+void ShenandoahHeap::increase_object_age(oop obj, uint additional_age) {
+  markWord w = obj->has_displaced_mark() ? obj->displaced_mark() : obj->mark();
+  w = w.set_age(MIN2(markWord::max_age, w.age() + additional_age));
+  if (obj->has_displaced_mark()) {
+    obj->set_displaced_mark(w);
+  } else {
+    obj->set_mark(w);
+  }
+}
+
 const char* ShenandoahHeap::init_mark_event_message() const {
   assert(!has_forwarded_objects(), "Should not have forwarded objects here");
 

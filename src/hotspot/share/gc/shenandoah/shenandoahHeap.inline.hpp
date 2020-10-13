@@ -261,7 +261,8 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
   assert(ShenandoahThreadLocalData::is_evac_allowed(thread), "must be enclosed in oom-evac scope");
 
   size_t size = p->size();
-  ShenandoahRegionAffiliation target_gen = heap_region_containing(p)->affiliation();
+  ShenandoahHeapRegion* r = heap_region_containing(p);
+  ShenandoahRegionAffiliation target_gen = r->affiliation();
   if (target_gen == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
     markWord mark = p->mark();
     if (mark.is_marked()) {
@@ -275,7 +276,7 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
     }
   }
 
-  assert(!heap_region_containing(p)->is_humongous(), "never evacuate humongous objects");
+  assert(!r->is_humongous(), "never evacuate humongous objects");
 
   bool alloc_from_gclab = true;
   HeapWord* copy = NULL;
@@ -309,18 +310,24 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
   // Copy the object:
   Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(p), copy, size);
 
-  // Try to install the new forwarding pointer.
   oop copy_val = oop(copy);
+  if (target_gen == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+    // Increment the age in young copies, absorbing region age.
+    // (Only retired regions will have more than zero age to pass along.)
+    ShenandoahHeap::increase_object_age(copy_val, r->age() + 1);
+
+    // Note that p may have been forwarded by another thread,
+    // anywhere between here and the check above for forwarding.
+    // In that case try_update_forwardee() below will not be successful
+    // and the increment we just performed will simply be forgotten,
+    // but it will have succeeded in said other thread.
+  }
+
+  // Try to install the new forwarding pointer.
   oop result = ShenandoahForwarding::try_update_forwardee(p, copy_val);
   if (result == copy_val) {
     // Successfully evacuated. Our copy is now the public one!
     shenandoah_assert_correct(NULL, copy_val);
-
-    // Increment age in young copies
-    if (target_gen == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
-      copy_val->incr_age();
-    }
-
     return copy_val;
   }  else {
     // Failed to evacuate. We need to deal with the object that is left behind. Since this

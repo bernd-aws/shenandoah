@@ -736,6 +736,8 @@ public:
 
   void deduplicate_string(oop str);
 
+  static void increase_object_age(oop obj, uint additional_age);
+
 private:
   void trash_cset_regions();
   void update_heap_references(bool concurrent);

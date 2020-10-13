@@ -32,6 +32,10 @@ void ShenandoahFinalMarkUpdateRegionStateClosure::heap_region_do(ShenandoahHeapR
     assert(!r->has_live(), "Region " SIZE_FORMAT " should have no live data", r->index());
     assert(_ctx->top_at_mark_start(r) == r->top(),
            "Region " SIZE_FORMAT " should have correct TAMS", r->index());
+
+    // We only age retired regions,
+    // so that objects do not assimilate the extra age of a region they get evacuated into.
+    // Here we err on the side of tenuring objects too late, to avoid promoting too early.
+    r->increment_age();
   }
 }
-

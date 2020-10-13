@@ -69,7 +69,8 @@ ShenandoahHeapRegion::ShenandoahHeapRegion(HeapWord* start, size_t index, bool c
   _live_data(0),
   _critical_pins(0),
   _update_watermark(start),
-  _affiliation(ShenandoahRegionAffiliation::FREE) {
+  _affiliation(ShenandoahRegionAffiliation::FREE),
+  _age(0) {
 
   assert(Universe::on_page_boundary(_bottom) && Universe::on_page_boundary(_end),
          "invalid space boundaries");
@@ -734,6 +735,7 @@ void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affil
       card_table->clear_MemRegion(MemRegion(_bottom, _end));
       break;
     case YOUNG_GENERATION:
+      reset_age();
       heap->young_generation()->increment_affiliated_region_count();
       break;
     case OLD_GENERATION:
