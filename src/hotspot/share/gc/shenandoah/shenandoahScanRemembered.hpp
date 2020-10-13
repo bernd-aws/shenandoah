@@ -780,8 +780,7 @@ public:
   }
 
   // This has side effect of clearing ObjectStartsInCardRegion bit.
-  inline void setCrossingObjectStart(uint32_t card_no,
-				     uint_16 crossing_offset) {
+  inline void setCrossingObjectStart(uint32_t card_no, uint_16 crossing_offset) {
     object_starts[card_no] = crossing_offset;
   }
 #endif  // IMPLEMENT_THIS_OPTIMIZATION_LATER
@@ -912,8 +911,7 @@ public:
     uint32_t next_cluster = cluster_at_start + 1;
     uint32_t card_at_next_cluster = cardAtCluster(next_cluster);
     uint32_t last_card_of_this_cluster = card_at_next_cluster - 1;
-    uint32_t last_card_in_cluster = ((card_at_end < last_card_of_this_cluster)
-				    ? card_at_end: last_card_of_this_cluster);
+    uint32_t last_card_in_cluster = ((card_at_end < last_card_of_this_cluster) ? card_at_end: last_card_of_this_cluster);
 
     uint_16 crossing_map_within_cluster = address - cluster_at_start;
 
@@ -1143,8 +1141,9 @@ public:
   // ClosureType equal to ShenandoahEvacuateUpdateRootsClosure.
 
   template <typename ClosureType>
-  void processClusters(uint32_t first_cluster,
-		       uint32_t count, ClosureType *oops);
+  void process_clusters(uint32_t first_cluster, uint32_t count, ClosureType *oops);
+
+ uint32_t cluster_for_addr(HeapWord *addr);
 
   // To Do:
   //  Create subclasses of ShenandoahInitMarkRootsClosure and

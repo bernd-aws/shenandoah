@@ -106,6 +106,22 @@ public:
     switch (_scm->generation_mode()) {
       case YOUNG: {
         ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS> mark_cl(q);
+
+	// Do the remembered set scanning before the root scanning as the current implementation of remembered set scanning
+	// does not do workload balancing.  If certain worker threads end up with disproportionate amounts of remembered set
+	// scanning effort, the subsequent root scanning effort will balance workload to even effort between threads.
+	size_t r;
+	RememberedScanner *rs = heap->card_scan();
+	unsigned int total_regions = heap->num_regions();
+	for (r = worker_id % _workers; r < total_regions; r += _workers) {
+          ShenandoahHeapRegion *rp = heap->get_region(r);
+          if (rp->affiliation() == OLD_GENERATION) {
+            uint32_t start_cluster_no = rs->cluster_for_addr(rp->bottom());
+            uint32_t stop_cluster_no  = rs->cluster_for_addr(rp->end());
+            rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(start_cluster_no, stop_cluster_no + 1 - start_cluster_no, &mark_cl);
+	  }
+	}
+
         do_work(heap, &mark_cl, worker_id);
         break;
       }

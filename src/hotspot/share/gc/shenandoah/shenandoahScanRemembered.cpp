@@ -71,8 +71,7 @@ void ShenandoahDirectCardMarkRememberedSet::initializeOverreach(
     *omp++ = CardTable::clean_card_val();
 }
 
-void ShenandoahDirectCardMarkRememberedSet::mergeOverreach(
-    uint32_t first_cluster, uint32_t count) {
+void ShenandoahDirectCardMarkRememberedSet::mergeOverreach(uint32_t first_cluster, uint32_t count) {
 
   // We can make this run faster in the future by explicitly
   // unrolling the loop and doing wide writes if the compiler
@@ -91,11 +90,8 @@ void ShenandoahDirectCardMarkRememberedSet::mergeOverreach(
 }
 
 
-/* Implementation is not correct.  ShenandoahBufferWithSATBRememberedSet
- * is a placeholder for future planned improvements.
- */
-ShenandoahBufferWithSATBRememberedSet::ShenandoahBufferWithSATBRememberedSet(
-    size_t card_count)
+// Implementation is not correct.  ShenandoahBufferWithSATBRememberedSet is a placeholder for future planned improvements.
+ShenandoahBufferWithSATBRememberedSet::ShenandoahBufferWithSATBRememberedSet(size_t card_count)
 {
   _heap = ShenandoahHeap::heap();
 
@@ -154,8 +150,7 @@ uint32_t ShenandoahCardCluster<RememberedSet>::getLastStart(uint32_t card_no) {
 }
 
 template <class RememberedSet>
-uint8_t ShenandoahCardCluster<RememberedSet>::getCrossingObjectStart(
-    uint32_t card_no) {
+uint8_t ShenandoahCardCluster<RememberedSet>::getCrossingObjectStart(uint32_t card_no) {
   assert((object_starts[card_no] & ObjectStartsInCardRegion) == 0);
   return object_starts[card_no] * CardWordOffsetMultiplier;
 }
