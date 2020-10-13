@@ -22,18 +22,25 @@
  *
  */
 
-#include "gc/shenandoah/shenandoahConcurrentMark.hpp"
 #include "gc/shenandoah/shenandoahConcurrentRoots.hpp"
 #include "gc/shenandoah/shenandoahFreeSet.hpp"
 #include "gc/shenandoah/shenandoahHeap.hpp"
 #include "gc/shenandoah/shenandoahMarkClosures.hpp"
-#include "gc/shenandoah/shenandoahOopClosures.hpp"
 #include "gc/shenandoah/shenandoahUtils.hpp"
 #include "gc/shenandoah/shenandoahVerifier.hpp"
 #include "gc/shenandoah/shenandoahGlobalGeneration.hpp"
 #include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
 
+
+size_t ShenandoahGlobalGeneration::max_capacity() const {
+  return ShenandoahHeap::heap()->max_capacity();
+}
+
 size_t ShenandoahGlobalGeneration::capacity() const {
+  return ShenandoahHeap::heap()->capacity();
+}
+
+size_t ShenandoahGlobalGeneration::soft_max_capacity() const {
   return ShenandoahHeap::heap()->soft_max_capacity();
 }
 
@@ -170,3 +177,4 @@ void ShenandoahGlobalGeneration::op_final_mark() {
     }
   }
 }
+

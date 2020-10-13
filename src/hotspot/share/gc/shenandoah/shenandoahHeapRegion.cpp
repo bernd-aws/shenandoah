@@ -446,6 +446,8 @@ void ShenandoahHeapRegion::recycle() {
   set_update_watermark(bottom());
 
   make_empty();
+
+  // HEY! Should this `set_affiliation` to maintain affiliation accounting?
   _affiliation = ShenandoahRegionAffiliation::FREE;
 
   if (ZapUnusedHeapArea) {
@@ -717,6 +719,8 @@ public:
 };
 
 void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affiliation) {
+  shenandoah_assert_heaplocked_or_safepoint();
+
   if (_affiliation == new_affiliation) {
     return;
   }

@@ -42,15 +42,21 @@ public:
   void decrease_used(size_t bytes);
 
 private:
-  virtual size_t configured_capacity() const;
+  size_t configured_capacity(size_t capacity) const;
 
 public:
+
+  void log_status() const;
+
+  virtual size_t max_capacity() const;
+  virtual size_t soft_max_capacity() const;
   virtual size_t capacity() const;
   virtual size_t used() const { return _used; }
   virtual size_t available() const;
 
   virtual void op_final_mark();
 
+  // This is invoked after the final compaction phase of a STW full collect.
   void promote_all();
 };
 

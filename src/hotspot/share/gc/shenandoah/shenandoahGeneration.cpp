@@ -154,3 +154,7 @@ void ShenandoahGeneration::op_mark() {
   concurrent_mark()->mark_from_roots();
 }
 
+size_t ShenandoahGeneration::bytes_allocated_since_gc_start() {
+  return ShenandoahHeap::heap()->bytes_allocated_since_gc_start();
+}
+

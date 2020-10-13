@@ -43,7 +43,7 @@ int ShenandoahHeuristics::compare_by_garbage(RegionData a, RegionData b) {
   else return 0;
 }
 
-ShenandoahHeuristics::ShenandoahHeuristics() :
+ShenandoahHeuristics::ShenandoahHeuristics(ShenandoahGeneration *generation) :
   _region_data(NULL),
   _degenerated_cycles_in_a_row(0),
   _successful_cycles_in_a_row(0),
@@ -52,7 +52,8 @@ ShenandoahHeuristics::ShenandoahHeuristics() :
   _gc_times_learned(0),
   _gc_time_penalties(0),
   _gc_time_history(new TruncatedSeq(5)),
-  _metaspace_oom()
+  _metaspace_oom(),
+  _generation(generation)
 {
   // No unloading during concurrent mark? Communicate that to heuristics
   if (!ClassUnloadingWithConcurrentMark) {
@@ -97,7 +98,7 @@ void ShenandoahHeuristics::choose_collection_set(ShenandoahCollectionSet* collec
 
   for (size_t i = 0; i < num_regions; i++) {
     ShenandoahHeapRegion* region = heap->get_region(i);
-    if (heap->mode()->is_generational() && region->affiliation() != ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+    if (heap->mode()->is_generational() && !region->is_young()) {
       // TODO: "generational" means young collection only for now.
       continue;
     }

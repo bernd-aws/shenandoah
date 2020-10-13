@@ -22,7 +22,6 @@
  *
  */
 
-#include "gc/shenandoah/shenandoahConcurrentMark.hpp"
 #include "gc/shenandoah/shenandoahConcurrentRoots.hpp"
 #include "gc/shenandoah/shenandoahFreeSet.hpp"
 #include "gc/shenandoah/shenandoahHeap.hpp"
@@ -47,10 +46,12 @@ void ShenandoahYoungGeneration::decrement_affiliated_region_count() {
 }
 
 void ShenandoahYoungGeneration::increase_used(size_t bytes) {
+  shenandoah_assert_heaplocked();
   _used += bytes;
 }
 
 void ShenandoahYoungGeneration::decrease_used(size_t bytes) {
+  shenandoah_assert_heaplocked_or_safepoint();
   assert(used() >= bytes, "cannot reduce bytes used by young generation below zero");
   _used -= bytes;
 }
@@ -66,8 +67,7 @@ void ShenandoahYoungGeneration::decrease_used(size_t bytes) {
 // If MaxNewSize is set it provides an upper bound.
 // If this bound is smaller than NewSize, it supersedes,
 // resulting in a fixed size given by MaxNewSize.
-size_t ShenandoahYoungGeneration::configured_capacity() const {
-  size_t capacity = ShenandoahHeap::heap()->soft_max_capacity();
+size_t ShenandoahYoungGeneration::configured_capacity(size_t capacity) const {
   if (FLAG_IS_CMDLINE(NewSize) && !FLAG_IS_CMDLINE(MaxNewSize) && !FLAG_IS_CMDLINE(NewRatio)) {
     capacity = MIN2(NewSize, capacity);
   } else {
@@ -82,13 +82,23 @@ size_t ShenandoahYoungGeneration::configured_capacity() const {
   return capacity;
 }
 
+size_t ShenandoahYoungGeneration::soft_max_capacity() const {
+  size_t capacity = ShenandoahHeap::heap()->soft_max_capacity();
+  return configured_capacity(capacity);
+}
+
+size_t ShenandoahYoungGeneration::max_capacity() const {
+  size_t capacity = ShenandoahHeap::heap()->max_capacity();
+  return configured_capacity(capacity);
+}
+
 size_t ShenandoahYoungGeneration::capacity() const {
   size_t used_regions_capacity = _affiliated_region_count * ShenandoahHeapRegion::region_size_bytes();
 
   assert(used() <= used_regions_capacity, "Must not use more than we have - used: " SIZE_FORMAT ", used_regions_capacity: " SIZE_FORMAT,
                                           used_regions_capacity, used());
 
-  return MAX2(configured_capacity(), used_regions_capacity);
+  return MAX2(soft_max_capacity(), used_regions_capacity);
 }
 
 size_t ShenandoahYoungGeneration::available() const {
@@ -226,4 +236,8 @@ void ShenandoahYoungGeneration::promote_all() {
   }
 
   assert(_affiliated_region_count == 0, "young generation must not have affiliated regions after reset");
+}
+
+void ShenandoahYoungGeneration::log_status() const {
+  LogTarget(Info, gc, ergo) lt;
 }

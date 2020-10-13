@@ -53,14 +53,15 @@ void ShenandoahSATBMode::initialize_flags() const {
 
 ShenandoahHeuristics* ShenandoahSATBMode::initialize_heuristics() const {
   if (ShenandoahGCHeuristics != NULL) {
+    ShenandoahGeneration *generation = ShenandoahHeap::heap()->global_generation();
     if (strcmp(ShenandoahGCHeuristics, "aggressive") == 0) {
       return new ShenandoahAggressiveHeuristics();
     } else if (strcmp(ShenandoahGCHeuristics, "static") == 0) {
-      return new ShenandoahStaticHeuristics();
+      return new ShenandoahStaticHeuristics(generation);
     } else if (strcmp(ShenandoahGCHeuristics, "adaptive") == 0) {
-      return new ShenandoahAdaptiveHeuristics();
+      return new ShenandoahAdaptiveHeuristics(generation);
     } else if (strcmp(ShenandoahGCHeuristics, "compact") == 0) {
-      return new ShenandoahCompactHeuristics();
+      return new ShenandoahCompactHeuristics(generation);
     } else {
       vm_exit_during_initialization("Unknown -XX:ShenandoahGCHeuristics option");
     }

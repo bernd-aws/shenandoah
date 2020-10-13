@@ -210,6 +210,7 @@ void ShenandoahControlThread::run_service() {
       switch (mode) {
         case concurrent_normal:
           if (heap->mode()->is_generational()) {
+            heap->young_generation()->log_status();
             // TODO: Only young collections for now.
             // We'll add old collections later.
             service_concurrent_young_cycle(cause);

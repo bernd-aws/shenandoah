@@ -29,6 +29,8 @@
 
 class ShenandoahPassiveHeuristics : public ShenandoahHeuristics {
 public:
+  ShenandoahPassiveHeuristics() : ShenandoahHeuristics(NULL) {}
+
   virtual bool should_start_gc() const;
 
   virtual bool should_process_references();
