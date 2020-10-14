@@ -1150,22 +1150,6 @@ public:
     ShenandoahEvacuateUpdateRootsClosure<> cl;
     MarkingCodeBlobClosure blobsCl(&cl, CodeBlobToOopClosure::FixRelocations);
 
-    kelvin is here;
-    // Need to augment instantiation of ShenandoahEvacuateUpdateRootsTask
-    // so that it has 
-    // constructor arguments for ShenandoahConcurrentMark* scm and
-    // uint workers)
-
-    if (_scm->generation_mode() == YOUNG) {
-      // Do the remembered set scanning before the root scanning
-      // as the current implementation of remembered set scanning
-      // does not do workload balancing.  If certain worker
-      // threads end up with dispropritionate amounts of
-      // remembered set scanning effort, the subsequent root
-      // scanning effort will balance workload to even effort
-      // between threads.
-    }
-
     _rp->roots_do(worker_id, &cl);
   }
 };
