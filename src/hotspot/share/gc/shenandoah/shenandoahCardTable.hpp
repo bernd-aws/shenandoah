@@ -38,10 +38,9 @@ public:
 
   virtual void initialize();
 
-  virtual inline bool is_in_young(oop obj) const {
-    ShouldNotReachHere();
-    return false;
-  }
+  virtual bool is_in_young(oop obj) const;
+
+  bool is_dirty(MemRegion mr);
 };
 
 #endif // SHARE_VM_GC_SHENANDOAH_SHENANDOAHCARDTABLE_HPP

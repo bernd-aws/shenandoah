@@ -30,3 +30,17 @@ void ShenandoahCardTable::initialize() {
   CardTable::initialize();
   resize_covered_region(_whole_heap);
 }
+
+bool ShenandoahCardTable::is_in_young(oop obj) const {
+  return ShenandoahHeap::heap()->is_in_young(obj);
+}
+
+bool ShenandoahCardTable::is_dirty(MemRegion mr) {
+  for (size_t i = index_for(mr.start()); i <= index_for(mr.end() - 1); i++) {
+    CardValue* byte = byte_for_index(i);
+    if (*byte == CardTable::dirty_card_val()) {
+      return true;
+    }
+  }
+  return false;
+}

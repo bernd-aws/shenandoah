@@ -322,6 +322,10 @@
   product(bool, ShenandoahSuspendibleWorkers, false, EXPERIMENTAL,          \
           "Suspend concurrent GC worker threads at safepoints")             \
                                                                             \
+  product(bool, ShenandoahUseSimpleCardScanning, false, EXPERIMENTAL,       \
+          "Testing: use simplified, very inefficient but much less complex" \
+          " card table scanning.")                                          \
+                                                                            \
   product(bool, ShenandoahSATBBarrier, true, DIAGNOSTIC,                    \
           "Turn on/off SATB barriers in Shenandoah")                        \
                                                                             \

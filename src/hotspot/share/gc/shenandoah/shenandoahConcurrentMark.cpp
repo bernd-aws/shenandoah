@@ -82,19 +82,45 @@ ShenandoahMarkRefsSuperClosure::ShenandoahMarkRefsSuperClosure(ShenandoahObjToSc
   _mark_context(_heap->marking_context())
 { }
 
+// TODO: The C++ compiler does not accept a ShenandoahInitMarkRootsClosure in lieu of this class here,
+// no matter how we shape the template parameters and iterator arguments.
+// But this almost exact copy works.
+template<UpdateRefsMode UPDATE_REFS>
+class ShenandoahInitMarkOopClosure : public BasicOopIterateClosure {
+private:
+  ShenandoahObjToScanQueue* _queue;
+  ShenandoahHeap* _heap;
+  ShenandoahMarkingContext* const _mark_context;
+
+  template <class T>
+  inline void do_oop_work(T* p) {
+    ShenandoahConcurrentMark::mark_through_ref<T, YOUNG, UPDATE_REFS, NO_DEDUP>(p, _heap, _queue, _mark_context);
+  }
+
+public:
+  ShenandoahInitMarkOopClosure(ShenandoahObjToScanQueue* q) :
+    _queue(q),
+    _heap(ShenandoahHeap::heap()),
+    _mark_context(_heap->marking_context()) {};
+
+  void do_oop(narrowOop* p) { do_oop_work(p); }
+  void do_oop(oop* p)       { do_oop_work(p); }
+};
+
 template<UpdateRefsMode UPDATE_REFS>
 class ShenandoahInitMarkRootsTask : public AbstractGangTask {
 private:
   ShenandoahConcurrentMark* const _scm;
   ShenandoahRootScanner* const _rp;
-  uint const _workers;
+  uint const _nworkers;
+  ShenandoahRegionIterator* _regions;
 public:
-
-  ShenandoahInitMarkRootsTask(ShenandoahConcurrentMark* scm, ShenandoahRootScanner* rp, uint worker_count) :
+  ShenandoahInitMarkRootsTask(ShenandoahConcurrentMark* scm, ShenandoahRootScanner* rp, uint nworkers, ShenandoahRegionIterator* regions) :
     AbstractGangTask("Shenandoah Init Mark Roots"),
     _scm(scm),
     _rp(rp),
-    _workers(worker_count) {
+    _nworkers(nworkers),
+    _regions(regions) {
   }
 
   void work(uint worker_id) {
@@ -111,25 +137,38 @@ public:
       case YOUNG: {
         ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS> mark_cl(q);
 
-	// Do the remembered set scanning before the root scanning as the current implementation of remembered set scanning
-	// does not do workload balancing.  If certain worker threads end up with disproportionate amounts of remembered set
-	// scanning effort, the subsequent root scanning effort will balance workload to even effort between threads.
-	uint32_t r;
-	RememberedScanner *rs = heap->card_scan();
-	ReferenceProcessor* rp = heap->ref_processor();
-	unsigned int total_regions = heap->num_regions();
+        if (!ShenandoahUseSimpleCardScanning) {
+          // Do the remembered set scanning before the root scanning as the current implementation of remembered set scanning
+          // does not do workload balancing.  If certain worker threads end up with disproportionate amounts of remembered set
+          // scanning effort, the subsequent root scanning effort will balance workload to even effort between threads.
+          uint32_t r;
+          RememberedScanner *rs = heap->card_scan();
+          ReferenceProcessor* rp = heap->ref_processor();
+          unsigned int total_regions = heap->num_regions();
 
-	for (r = worker_id % _workers; r < total_regions; r += _workers) {
-          ShenandoahHeapRegion *region = heap->get_region(r);
+          for (r = worker_id % _nworkers; r < total_regions; r += _nworkers) {
+            ShenandoahHeapRegion *region = heap->get_region(r);
+            if (region->affiliation() == OLD_GENERATION) {
+              uint32_t start_cluster_no = rs->cluster_for_addr(region->bottom());
+              uint32_t stop_cluster_no  = rs->cluster_for_addr(region->end());
+              rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(worker_id, rp, _scm,
+                           start_cluster_no, stop_cluster_no + 1 - start_cluster_no, &mark_cl);
+            }
+          }
+        }
 
-          if (region->affiliation() == OLD_GENERATION) {
-            uint32_t start_cluster_no = rs->cluster_for_addr(region->bottom());
-            uint32_t stop_cluster_no  = rs->cluster_for_addr(region->end());
-            rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(worker_id, rp, _scm,
-										     start_cluster_no, stop_cluster_no + 1 - start_cluster_no, &mark_cl);
-	  }
-	}
         do_work(heap, &mark_cl, worker_id);
+
+        if (ShenandoahUseSimpleCardScanning) {
+          ShenandoahInitMarkOopClosure<UPDATE_REFS> mark_oop_cl(q);
+          ShenandoahHeapRegion* r = _regions->next();
+          while (r != NULL) {
+            if (r->affiliation() == OLD_GENERATION && ShenandoahBarrierSet::barrier_set()->card_table()->is_dirty(MemRegion(r->bottom(), r->top()))) {
+              r->oop_iterate(&mark_oop_cl);
+            }
+            r = _regions->next();
+          }
+        }
         break;
       }
       case GLOBAL: {
@@ -357,12 +396,14 @@ void ShenandoahConcurrentMark::mark_roots(GenerationMode generation, ShenandoahP
   task_queues()->reserve(nworkers);
 
   if (heap->has_forwarded_objects()) {
-    ShenandoahInitMarkRootsTask<RESOLVE> mark_roots(this, &root_proc, nworkers);
+    ShenandoahRegionIterator regions;
+    ShenandoahInitMarkRootsTask<RESOLVE> mark_roots(this, &root_proc, nworkers, &regions);
     workers->run_task(&mark_roots);
   } else {
     // No need to update references, which means the heap is stable.
     // Can save time not walking through forwarding pointers.
-    ShenandoahInitMarkRootsTask<NONE> mark_roots(this, &root_proc, nworkers);
+    ShenandoahRegionIterator regions;
+    ShenandoahInitMarkRootsTask<NONE> mark_roots(this, &root_proc, nworkers, &regions);
     workers->run_task(&mark_roots);
   }
 }
