@@ -92,13 +92,13 @@ size_t ShenandoahYoungGeneration::max_capacity() const {
   return configured_capacity(capacity);
 }
 
-size_t ShenandoahYoungGeneration::capacity() const {
-  size_t used_regions_capacity = _affiliated_region_count * ShenandoahHeapRegion::region_size_bytes();
+size_t ShenandoahYoungGeneration::used_regions_size() const {
+  size_t used_regions_size = _affiliated_region_count * ShenandoahHeapRegion::region_size_bytes();
 
-  assert(used() <= used_regions_capacity, "Must not use more than we have - used: " SIZE_FORMAT ", used_regions_capacity: " SIZE_FORMAT,
-                                          used_regions_capacity, used());
+  assert(used() <= used_regions_size, "Must not use more than we have - used: " SIZE_FORMAT ", used_regions_size: " SIZE_FORMAT,
+         used(), used_regions_size);
 
-  return MAX2(soft_max_capacity(), used_regions_capacity);
+  return used_regions_size;
 }
 
 size_t ShenandoahYoungGeneration::available() const {
@@ -247,13 +247,17 @@ void ShenandoahYoungGeneration::log_status() const {
     return;
   }
 
+  // Not under a lock here, so just read these once to make sure byte size in
+  // proper unit and proper unit for byte size are consistent.
   size_t used = _used;
   size_t soft_max_cap = soft_max_capacity();
   size_t max_cap = max_capacity();
   size_t free = available();
-  lt.print("Young Generation Used: " SIZE_FORMAT "%s, Soft Capacity: " SIZE_FORMAT "%s, "
-           "Max Capacity: " SIZE_FORMAT " %s, Available: " SIZE_FORMAT " %s",
+  size_t used_regions = used_regions_size();
+  lt.print("Young Generation Used: " SIZE_FORMAT "%s, Used Regions: " SIZE_FORMAT "%s, "
+           "Soft Capacity: " SIZE_FORMAT "%s, Max Capacity: " SIZE_FORMAT " %s, Available: " SIZE_FORMAT " %s",
            byte_size_in_proper_unit(used),          proper_unit_for_byte_size(used),
+           byte_size_in_proper_unit(used_regions),  proper_unit_for_byte_size(used_regions),
            byte_size_in_proper_unit(soft_max_cap),  proper_unit_for_byte_size(soft_max_cap),
            byte_size_in_proper_unit(max_cap),       proper_unit_for_byte_size(max_cap),
            byte_size_in_proper_unit(free),          proper_unit_for_byte_size(free));

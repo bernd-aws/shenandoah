@@ -50,10 +50,7 @@ public:
 
   virtual size_t max_capacity() const;
   virtual size_t soft_max_capacity() const;
-  // HEY! This is unused and I don't understand the implementation.
-  // I think we can remove this and possibly stop accounting for the affiliated
-  // regions (since we now account for used bytes directly).
-  virtual size_t capacity() const;
+  virtual size_t used_regions_size() const;
   virtual size_t used() const { return _used; }
   virtual size_t available() const;
 
