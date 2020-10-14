@@ -40,6 +40,7 @@
 #include "gc/shenandoah/shenandoahControlThread.hpp"
 #include "gc/shenandoah/shenandoahMarkingContext.inline.hpp"
 #include "gc/shenandoah/shenandoahThreadLocalData.hpp"
+#include "gc/shenandoah/mode/shenandoahMode.hpp"
 #include "oops/compressedOops.inline.hpp"
 #include "oops/oop.inline.hpp"
 #include "runtime/atomic.hpp"
@@ -260,26 +261,34 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
 
   assert(ShenandoahThreadLocalData::is_evac_allowed(thread), "must be enclosed in oom-evac scope");
 
-  size_t size = p->size();
   ShenandoahHeapRegion* r = heap_region_containing(p);
+  assert(!r->is_humongous(), "never evacuate humongous objects");
+
   ShenandoahRegionAffiliation target_gen = r->affiliation();
-  if (target_gen == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+  if (mode()->is_generational() && target_gen == YOUNG_GENERATION) {
     markWord mark = p->mark();
     if (mark.is_marked()) {
       // Already forwarded.
       return ShenandoahBarrierSet::resolve_forwarded(p);
     } else {
-      if (mark.age() > InitialTenuringThreshold) {
-        //tty->print_cr("promoting object: " PTR_FORMAT, p2i(p));
-        //target_gen = ShenandoahRegionAffiliation::OLD_GENERATION;
+      if (mark.age() >= InitialTenuringThreshold) {
+        tty->print_cr("promoting object: " PTR_FORMAT, p2i(p));
+        oop result = try_evacuate_object(p, thread, r, OLD_GENERATION);
+        if (result == NULL) {
+          tty->print_cr("promotion failed, object remains in young gen: " PTR_FORMAT, p2i(p));
+        } else {
+          return result;
+        }
       }
     }
   }
+  return try_evacuate_object(p, thread, r, target_gen);
+}
 
-  assert(!r->is_humongous(), "never evacuate humongous objects");
-
+inline oop ShenandoahHeap::try_evacuate_object(oop p, Thread* thread, ShenandoahHeapRegion* from_region, ShenandoahRegionAffiliation target_gen) {
   bool alloc_from_gclab = true;
   HeapWord* copy = NULL;
+  size_t size = p->size();
 
 #ifdef ASSERT
   if (ShenandoahOOMDuringEvacALot &&
@@ -287,7 +296,7 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
         copy = NULL;
   } else {
 #endif
-    if (UseTLAB && target_gen == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+    if (UseTLAB && target_gen == YOUNG_GENERATION) {
       copy = allocate_from_gclab(thread, size);
     }
     if (copy == NULL) {
@@ -300,6 +309,11 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
 #endif
 
   if (copy == NULL) {
+    if (target_gen == OLD_GENERATION && from_region->affiliation() == YOUNG_GENERATION) {
+      // Indicate that a promotion attempt failed.
+      return NULL;
+    }
+
     control_thread()->handle_alloc_failure_evac(size);
 
     _oom_evac_handler.handle_out_of_memory_during_evacuation();
@@ -311,10 +325,10 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
   Copy::aligned_disjoint_words(cast_from_oop<HeapWord*>(p), copy, size);
 
   oop copy_val = oop(copy);
-  if (target_gen == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+  if (target_gen == YOUNG_GENERATION) {
     // Increment the age in young copies, absorbing region age.
     // (Only retired regions will have more than zero age to pass along.)
-    ShenandoahHeap::increase_object_age(copy_val, r->age() + 1);
+    ShenandoahHeap::increase_object_age(copy_val, from_region->age() + 1);
 
     // Note that p may have been forwarded by another thread,
     // anywhere between here and the check above for forwarding.
