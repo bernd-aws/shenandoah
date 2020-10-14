@@ -102,7 +102,9 @@ size_t ShenandoahYoungGeneration::capacity() const {
 }
 
 size_t ShenandoahYoungGeneration::available() const {
-  return MIN2(capacity() - used(), ShenandoahHeap::heap()->free_set()->available());
+  size_t in_use = used();
+  size_t soft_capacity = soft_max_capacity();
+  return in_use > soft_capacity ? 0 : soft_capacity - in_use;
 }
 
 // TODO: This is almost the same code as in ShenandoahGlobalGeneration for now, to be further differentiated.
@@ -230,7 +232,7 @@ void ShenandoahYoungGeneration::promote_all() {
   ShenandoahHeap* heap = ShenandoahHeap::heap();
   for (size_t index = 0; index < heap->num_regions(); index++) {
     ShenandoahHeapRegion* region = heap->get_region(index);
-    if (region->affiliation() == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
+    if (region->is_young()) {
       region->set_affiliation(ShenandoahRegionAffiliation::OLD_GENERATION);
     }
   }
@@ -240,4 +242,19 @@ void ShenandoahYoungGeneration::promote_all() {
 
 void ShenandoahYoungGeneration::log_status() const {
   LogTarget(Info, gc, ergo) lt;
+  
+  if (!lt.is_enabled()) {
+    return;
+  }
+
+  size_t used = _used;
+  size_t soft_max_cap = soft_max_capacity();
+  size_t max_cap = max_capacity();
+  size_t free = available();
+  lt.print("Young Generation Used: " SIZE_FORMAT "%s, Soft Capacity: " SIZE_FORMAT "%s, "
+           "Max Capacity: " SIZE_FORMAT " %s, Available: " SIZE_FORMAT " %s",
+           byte_size_in_proper_unit(used),          proper_unit_for_byte_size(used),
+           byte_size_in_proper_unit(soft_max_cap),  proper_unit_for_byte_size(soft_max_cap),
+           byte_size_in_proper_unit(max_cap),       proper_unit_for_byte_size(max_cap),
+           byte_size_in_proper_unit(free),          proper_unit_for_byte_size(free));
 }
