@@ -31,7 +31,7 @@
 
 class ShenandoahAdaptiveHeuristics : public ShenandoahHeuristics {
 public:
-  ShenandoahAdaptiveHeuristics(ShenandoahGeneration *generation);
+  ShenandoahAdaptiveHeuristics(ShenandoahGeneration* generation);
 
   virtual ~ShenandoahAdaptiveHeuristics();
 

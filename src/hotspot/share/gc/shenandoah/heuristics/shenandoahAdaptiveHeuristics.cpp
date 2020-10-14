@@ -32,7 +32,7 @@
 #include "logging/logTag.hpp"
 #include "utilities/quickSort.hpp"
 
-ShenandoahAdaptiveHeuristics::ShenandoahAdaptiveHeuristics(ShenandoahGeneration *generation) :
+ShenandoahAdaptiveHeuristics::ShenandoahAdaptiveHeuristics(ShenandoahGeneration* generation) :
   ShenandoahHeuristics(generation) {}
 
 ShenandoahAdaptiveHeuristics::~ShenandoahAdaptiveHeuristics() {}

@@ -95,7 +95,7 @@ protected:
   void adjust_penalty(intx step);
 
 public:
-  ShenandoahHeuristics(ShenandoahGeneration *generation);
+  ShenandoahHeuristics(ShenandoahGeneration* generation);
   virtual ~ShenandoahHeuristics();
 
   void record_metaspace_oom()     { _metaspace_oom.set(); }
