@@ -226,7 +226,34 @@ void ShenandoahYoungGeneration::op_final_mark() {
   }
 }
 
-void ShenandoahYoungGeneration::promote_all() {
+class ShenandoahPromoteTenuredRegionsTask : public AbstractGangTask {
+private:
+  ShenandoahRegionIterator* _regions;
+public:
+  ShenandoahPromoteTenuredRegionsTask(ShenandoahRegionIterator* regions) :
+    AbstractGangTask("Shenandoah Promote Tenured Regions"),
+    _regions(regions) {
+  }
+
+  void work(uint worker_id) {
+    ShenandoahParallelWorkerSession worker_session(worker_id);
+    ShenandoahHeapRegion* r = _regions->next();
+    while (r != NULL) {
+      if (r->affiliation() == YOUNG_GENERATION && r->age() >= InitialTenuringThreshold) {
+        r->set_affiliation(OLD_GENERATION);
+      }
+      r = _regions->next();
+    }
+  }
+};
+
+void ShenandoahYoungGeneration::promote_tenured_regions() {
+  ShenandoahRegionIterator regions;
+  ShenandoahPromoteTenuredRegionsTask task(&regions);
+  ShenandoahHeap::heap()->workers()->run_task(&task);
+}
+
+void ShenandoahYoungGeneration::promote_all_regions() {
   _used = 0;
 
   ShenandoahHeap* heap = ShenandoahHeap::heap();

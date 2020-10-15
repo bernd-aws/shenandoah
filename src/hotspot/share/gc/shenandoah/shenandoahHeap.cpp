@@ -2577,6 +2577,12 @@ void ShenandoahHeap::op_final_updaterefs() {
     ShenandoahHeapLocker locker(lock());
     _free_set->rebuild();
   }
+
+  {
+    ShenandoahGCPhase phase(ShenandoahPhaseTimings::final_update_refs_promote_tenured_regions);
+    ShenandoahHeapLocker locker(lock());
+    young_generation()->promote_tenured_regions();
+  }
 }
 
 void ShenandoahHeap::print_extended_on(outputStream *st) const {

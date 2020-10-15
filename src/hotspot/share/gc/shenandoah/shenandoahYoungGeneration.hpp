@@ -56,8 +56,8 @@ public:
 
   virtual void op_final_mark();
 
-  // This is invoked after the final compaction phase of a STW full collect.
-  void promote_all();
+  void promote_tenured_regions();
+  void promote_all_regions();
 };
 
 #endif // SHARE_VM_GC_SHENANDOAH_SHENANDOAHYOUNGGENERATION_HPP
