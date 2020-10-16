@@ -37,12 +37,19 @@ ShenandoahDirectCardMarkRememberedSet::ShenandoahDirectCardMarkRememberedSet(Car
   _cluster_count = (total_card_count / ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster);
   _card_shift = CardTable::card_shift;
 
-  _whole_heap_base = _card_table->addr_for(_byte_map);
-  _whole_heap_end = _card_table->addr_for(_byte_map + total_card_count);
-
+  printf("Instantiating ShenandoahDirectCardMarkRememberedSet(%s = 0x%lx)\n",
+	 "total_card_count", total_card_count);
 
   _byte_map = _card_table->byte_for_index(0);
+
+  _whole_heap_base = _card_table->addr_for(_byte_map);
+  _whole_heap_end = _whole_heap_base + total_card_count * CardTable::card_size;
+
+  printf("  whole heap spans 0x%lx to 0x%lx\n",
+	 (uint64_t) _whole_heap_base, (uint64_t) _whole_heap_end);
+
   _byte_map_base = _byte_map - (uintptr_t(_whole_heap_base) >> _card_shift);
+
 
   _overreach_map = (uint8_t *) malloc(total_card_count);
   _overreach_map_base = (_overreach_map -

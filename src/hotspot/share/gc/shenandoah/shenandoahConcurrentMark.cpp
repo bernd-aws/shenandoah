@@ -114,19 +114,31 @@ public:
 	// Do the remembered set scanning before the root scanning as the current implementation of remembered set scanning
 	// does not do workload balancing.  If certain worker threads end up with disproportionate amounts of remembered set
 	// scanning effort, the subsequent root scanning effort will balance workload to even effort between threads.
-	size_t r;
+	uint32_t r;
 	RememberedScanner *rs = heap->card_scan();
 	ReferenceProcessor* rp = heap->ref_processor();
 	unsigned int total_regions = heap->num_regions();
+
+	printf("worker(%d) endeavoring to scan remembered set of %u regions\n",
+	       worker_id, total_regions);
+
 	for (r = worker_id % _workers; r < total_regions; r += _workers) {
           ShenandoahHeapRegion *region = heap->get_region(r);
+
+	  printf("worker(%d) looking at region %u\n", worker_id, r);
+
           if (region->affiliation() == OLD_GENERATION) {
             uint32_t start_cluster_no = rs->cluster_for_addr(region->bottom());
             uint32_t stop_cluster_no  = rs->cluster_for_addr(region->end());
             rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(worker_id, rp, _scm,
 										     start_cluster_no, stop_cluster_no + 1 - start_cluster_no, &mark_cl);
 	  }
+	  else   // delete these two lines
+            printf("worker(%d) says this region %u is not old\n",
+		   worker_id, r);
 	}
+
+	printf("worker(%d) done scanning remembered sets\n", worker_id);
 
         do_work(heap, &mark_cl, worker_id);
         break;
