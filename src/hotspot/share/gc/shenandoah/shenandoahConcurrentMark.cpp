@@ -116,13 +116,15 @@ public:
 	// scanning effort, the subsequent root scanning effort will balance workload to even effort between threads.
 	size_t r;
 	RememberedScanner *rs = heap->card_scan();
+	ReferenceProcessor* rp = heap->ref_processor();
 	unsigned int total_regions = heap->num_regions();
 	for (r = worker_id % _workers; r < total_regions; r += _workers) {
-          ShenandoahHeapRegion *rp = heap->get_region(r);
-          if (rp->affiliation() == OLD_GENERATION) {
-            uint32_t start_cluster_no = rs->cluster_for_addr(rp->bottom());
-            uint32_t stop_cluster_no  = rs->cluster_for_addr(rp->end());
-            rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(start_cluster_no, stop_cluster_no + 1 - start_cluster_no, &mark_cl);
+          ShenandoahHeapRegion *region = heap->get_region(r);
+          if (region->affiliation() == OLD_GENERATION) {
+            uint32_t start_cluster_no = rs->cluster_for_addr(region->bottom());
+            uint32_t stop_cluster_no  = rs->cluster_for_addr(region->end());
+            rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(worker_id, rp, _scm,
+										     start_cluster_no, stop_cluster_no + 1 - start_cluster_no, &mark_cl);
 	  }
 	}
 

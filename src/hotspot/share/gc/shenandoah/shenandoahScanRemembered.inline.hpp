@@ -324,7 +324,8 @@ ShenandoahScanRemembered<RememberedSet>::~ShenandoahScanRemembered() {
 template<typename RememberedSet>
 template <typename ClosureType>
 inline void 
-ShenandoahScanRemembered<RememberedSet>::process_clusters(uint32_t first_cluster, uint32_t count, ClosureType *oops) {
+ShenandoahScanRemembered<RememberedSet>::process_clusters(uint worker_id, ReferenceProcessor* rp, ShenandoahConcurrentMark* cm,
+							  uint32_t first_cluster, uint32_t count, ClosureType *oops) {
 
   // Unlike traditional Shenandoah marking, the old-gen resident objects that are examined as part of the remembered set are not
   // themselves marked.  Each such object will be scanned only once.  Any young-gen objects referenced from the remembered set will
@@ -353,9 +354,11 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint32_t first_cluster
 	   // particular, in that case, we might want to divide the effort for scanning of a very long object array
 	   // between multiple threads.
 	   if (obj->is_objArray()) {
+             ShenandoahObjToScanQueue* q = cm->get_queue(worker_id); // kelvin to confirm: get_queue wants worker_id
+             ShenandoahMarkRefsClosure<YOUNG> cl(q, rp);
              objArrayOop array = objArrayOop(obj);
 	     int len = array->length();
-	     array->oop_iterate_range(oops, 0, len);
+	     array->oop_iterate_range(&cl, 0, len);
 	   } else
              oops->do_oop(&obj);
 	   p += obj->size();
@@ -388,9 +391,11 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint32_t first_cluster
        }
        if (reaches_next_cluster || spans_dirty_within_this_cluster) {
          if (obj->is_objArray()) {
+	   ShenandoahObjToScanQueue* q = cm->get_queue(worker_id); // kelvin to confirm: get_queue wants worker_id
+           ShenandoahMarkRefsClosure<YOUNG> cl(q, rp);
            objArrayOop array = objArrayOop(obj);
 	   int len = array->length();
-	   array->oop_iterate_range(oops, 0, len);
+	   array->oop_iterate_range(&cl, 0, len);
 	 } else
 	   oops->do_oop(&obj);
        }

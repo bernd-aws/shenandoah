@@ -213,21 +213,12 @@
 #ifndef SHARE_GC_SHENANDOAH_SHENANDOAHSCANREMEMBERED_HPP
 #define SHARE_GC_SHENANDOAH_SHENANDOAHSCANREMEMBERED_HPP
 
-#ifdef COMMENT_THIS_OUT
-#include "code/codeCache.hpp"
-#include "gc/shared/oopStorageSetParState.hpp"
-#include "gc/shenandoah/shenandoahCodeRoots.hpp"
-#include "gc/shenandoah/shenandoahHeap.hpp"
-#include "gc/shenandoah/shenandoahPhaseTimings.hpp"
-#include "gc/shenandoah/shenandoahSharedVariables.hpp"
-#include "gc/shenandoah/shenandoahUtils.hpp"
-
-#endif
-
 #include <stdint.h>
 #include "memory/iterator.hpp"
 #include "gc/shenandoah/shenandoahCardTable.hpp"
 
+class ReferenceProcessor;
+class ShenandoahConcurrentMark;
 class ShenandoahHeap;
 class CardTable;
 
@@ -1008,9 +999,9 @@ public:
   // the template expansions were making it difficult for the link/loader to resolve references to the template-
   // parameterized implementations of this service.
   template <typename ClosureType>
-  void process_clusters(uint32_t first_cluster, uint32_t count, ClosureType *oops);
+  void process_clusters(uint worker_id, ReferenceProcessor* rp, ShenandoahConcurrentMark* cm, uint32_t first_cluster, uint32_t count, ClosureType *oops);
 
- uint32_t cluster_for_addr(HeapWord *addr);
+  uint32_t cluster_for_addr(HeapWord *addr);
 
   // To Do:
   //  Create subclasses of ShenandoahInitMarkRootsClosure and
