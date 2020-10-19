@@ -272,11 +272,15 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
       return ShenandoahBarrierSet::resolve_forwarded(p);
     } else {
       if (mark.age() >= InitialTenuringThreshold) {
-        tty->print_cr("promoting object: " PTR_FORMAT, p2i(p));
         oop result = try_evacuate_object(p, thread, r, OLD_GENERATION);
-        if (result == NULL) {
-          tty->print_cr("promotion failed, object remains in young gen: " PTR_FORMAT, p2i(p));
-        } else {
+        if (result != NULL) {
+          // TODO: Just marking the cards covering this object dirty
+          // may overall be less efficient than scanning it now for references to young gen
+          // or other alternatives like deferred card marking or scanning.
+          // We should revisit this.
+          // Furthermore, the object start should be registered for remset scanning.
+          MemRegion mr(cast_from_oop<HeapWord*>(p), p->size());
+          ShenandoahBarrierSet::barrier_set()->card_table()->invalidate(mr);
           return result;
         }
       }
