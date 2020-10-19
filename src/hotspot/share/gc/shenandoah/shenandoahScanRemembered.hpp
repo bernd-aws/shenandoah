@@ -109,7 +109,7 @@
 //      Assure that exactly one worker thread initializes each
 //      cluster of overreach memory by invoking:
 //
-//        rs->initializeOverreach(cluster_no, cluster_count)
+//        rs->initialize_overreach(cluster_no, cluster_count)
 //
 //      in separate threads.  (Divide up the clusters so that
 //      different threads are responsible for initializing different
@@ -191,7 +191,7 @@
 //      Assure that exactly one worker thread initializes each
 //      cluster of overreach memory by invoking:
 //
-//        rs->mergeOverreach(cluster_no, cluster_count)
+//        rs->merge_overreach(cluster_no, cluster_count)
 //
 //      in separate threads.  (Divide up the clusters so that
 //      different threads are responsible for merging different
@@ -251,25 +251,25 @@ public:
   ShenandoahDirectCardMarkRememberedSet(CardTable *card_table, size_t total_card_count);
   ~ShenandoahDirectCardMarkRememberedSet();
 
-  uint32_t cardNoForAddr(HeapWord *p);
-  HeapWord *addrForCardNo(uint32_t card_no);
-  bool isCardDirty(uint32_t card_no);
-  void markCardAsDirty(uint32_t card_no);
-  void markCardAsClean(uint32_t card_no);
-  void markOverreachCardAsDirty(uint32_t card_no);
-  bool isCardDirty(HeapWord *p);
-  void markCardAsDirty(HeapWord *p);
-  void markCardAsClean(HeapWord *p);
-  void markOverreachCardAsDirty(void *p);
-  uint32_t clusterCount();
+  uint32_t card_index_for_addr(HeapWord *p);
+  HeapWord *addr_for_card_index(uint32_t card_index);
+  bool is_card_dirty(uint32_t card_index);
+  void mark_card_as_dirty(uint32_t card_index);
+  void mark_card_as_clean(uint32_t card_index);
+  void mark_overreach_card_as_dirty(uint32_t card_index);
+  bool is_card_dirty(HeapWord *p);
+  void mark_card_as_dirty(HeapWord *p);
+  void mark_card_as_clean(HeapWord *p);
+  void mark_overreach_card_as_dirty(void *p);
+  uint32_t cluster_count();
 
   // Called by multiple GC threads at start of concurrent mark and/ evacuation phases.  Each parallel GC thread typically
   // initializes a different subranges of all overreach entries.
-  void initializeOverreach(uint32_t first_cluster, uint32_t count);
+  void initialize_overreach(uint32_t first_cluster, uint32_t count);
 
   // Called by GC thread at end of concurrent mark or evacuation phase./ Each parallel GC thread typically merges different
   // subranges of all overreach entries.
-  void mergeOverreach(uint32_t first_cluster, uint32_t count);
+  void merge_overreach(uint32_t first_cluster, uint32_t count);
 };
 
 //
@@ -343,25 +343,25 @@ public:
   ShenandoahBufferWithSATBRememberedSet(size_t card_count);
   ~ShenandoahBufferWithSATBRememberedSet();
 
-  uint32_t cardNoForAddr(HeapWord *p);
-  HeapWord *addrForCardNo(uint32_t card_no);
-  bool isCardDirty(uint32_t card_no);
-  void markCardAsDirty(uint32_t card_no);
-  void markCardAsClean(uint32_t card_no);
-  void markOverreachCardAsDirty(uint32_t card_no);
-  bool isCardDirty(HeapWord *p);
-  void markCardAsDirty(HeapWord *p);
-  void markCardAsClean(HeapWord *p);
-  void markOverreachCardAsDirty(void *p);
-  uint32_t clusterCount();
+  uint32_t card_index_for_addr(HeapWord *p);
+  HeapWord *addr_for_card_index(uint32_t card_index);
+  bool is_card_dirty(uint32_t card_index);
+  void mark_card_as_dirty(uint32_t card_index);
+  void mark_card_as_clean(uint32_t card_index);
+  void mark_overreach_card_as_dirty(uint32_t card_index);
+  bool is_card_dirty(HeapWord *p);
+  void mark_card_as_dirty(HeapWord *p);
+  void mark_card_as_clean(HeapWord *p);
+  void mark_overreach_card_as_dirty(void *p);
+  uint32_t cluster_count();
 
   // Called by multiple GC threads at start of concurrent mark and/ evacuation phases.  Each parallel GC thread typically
   // initializes a different subranges of all overreach entries.
-  void initializeOverreach(uint32_t first_cluster, uint32_t count);
+  void initialize_overreach(uint32_t first_cluster, uint32_t count);
 
   // Called by GC thread at end of concurrent mark or evacuation phase./ Each parallel GC thread typically merges different
   // subranges of all overreach entries.
-  void mergeOverreach(uint32_t first_cluster, uint32_t count);
+  void merge_overreach(uint32_t first_cluster, uint32_t count);
 };
 
 
@@ -527,7 +527,7 @@ public:
 // resolution of object start addresses.
 //
 // ShenandoahCardClusters supports all of the services of
-// RememberedSet, plus it supports registerObject() and lookupObject().
+// RememberedSet, plus it supports register_object() and lookup_object().
 //
 // There are two situations under which we need to know the location
 // at which the object spanning the start of a particular card-table
@@ -582,7 +582,7 @@ public:
   //
   // In the most recent implementation of
   //   ShenandoahScanRemembered::processClusters(),
-  // there is no need for the getCrossingObjectStart() method
+  // there is no need for the get_crossing_object_start() method
   // function, so there is no need to maintain the following
   // information.  The comment is left in place for now in case we
   // find it necessary to add support for this service at a later time.
@@ -599,7 +599,7 @@ public:
   //              spanning object from within the current cluster is
   //              ((63 * 64) - 8), which equals 0x0fbf. 
   //
-  // In the absence of the need to support getCrossingObjectStart(),
+  // In the absence of the need to support get_crossing_object_start(),
   // here is discussion of performance:
   //
   //  Suppose multiple garbage objects are coalesced during GC sweep
@@ -667,23 +667,23 @@ private:
   uint_16 *object_starts;
 
 public:
-  inline void setFirstStart(uint32_t card_no, uint8_t value) {
-    object_starts[card_no] &= ~FirstStartBits;
-    object_starts[card_no] |= (FirstStartBits & (value << FirstStartShift));
+  inline void set_first_start(uint32_t card_index, uint8_t value) {
+    object_starts[card_index] &= ~FirstStartBits;
+    object_starts[card_index] |= (FirstStartBits & (value << FirstStartShift));
   }
 
-  inline void setLastStart(uint32_t card_no, uint8_t value) {
-    object_starts[card_no] &= ~LastStartBits;
-    object_starts[card_no] |= (LastStartBits & (value << LastStartShift));
+  inline void set_last_start(uint32_t card_index, uint8_t value) {
+    object_starts[card_index] &= ~LastStartBits;
+    object_starts[card_index] |= (LastStartBits & (value << LastStartShift));
   }
 
-  inline void setHasObjectBit(uint32_t card_no) {
-    object_starts[card_no] |= ObjectStartsInCardRegion;
+  inline void set_has_object_bit(uint32_t card_index) {
+    object_starts[card_index] |= ObjectStartsInCardRegion;
   }
 
   // This has side effect of clearing ObjectStartsInCardRegion bit.
-  inline void setCrossingObjectStart(uint32_t card_no, uint_16 crossing_offset) {
-    object_starts[card_no] = crossing_offset;
+  inline void set_crossing_object_start(uint32_t card_index, uint_16 crossing_offset) {
+    object_starts[card_index] = crossing_offset;
   }
 #endif  // IMPLEMENT_THIS_OPTIMIZATION_LATER
 
@@ -698,19 +698,19 @@ public:
   // find the object headers, and object headers provide information
   // about which fields within the object hold addresses.
   //
-  // The old-gen memory allocator invokes registerObject() for any
+  // The old-gen memory allocator invokes register_object() for any
   // object that is allocated within old-gen memory.  This identifies
   // the starting addresses of objects that span boundaries between
   // card regions.
   //
-  // It is not necessary to invoke registerObject at the very instant
+  // It is not necessary to invoke register_object at the very instant
   // an object is allocated.  It is only necessary to invoke it
   // prior to the next start of a garbage collection concurrent mark
   // or concurrent evacuation phase.  An "ideal" time to register
   // objects is during post-processing of a GCLAB after the GCLAB is
   // retired due to depletion of its memory.
   //
-  // registerObject() does not perform synchronization.  In the case
+  // register_object() does not perform synchronization.  In the case
   // that multiple threads are registering objects whose starting
   // addresses are within the same cluster, races between these
   // threads may result in corruption of the object-start data
@@ -780,7 +780,7 @@ public:
   //     commit-write barriers to assure that access to the
   //     object_starts information is coherent.
 
-  static void registerObject(void *address, uint32_t length_in_bytes) {
+  static void register_object(void *address, uint32_t length_in_bytes) {
 
 #ifdef IMPLEMENT_THIS_OPTIMIZATION_LATER
     uint32_t card_at_start = cardAtAddress(address);
@@ -797,14 +797,14 @@ public:
       (address - card_start_address) / CardOffsetMultiplier;
 
     if (!getHashObjectBit(card_at_start)) {
-      setHasObjectBit(card_at_start);
-      setFirstStart(card_at_start, offset_in_card);
-      setLastStart(card_at_start, offset_in_card);
+      set_has_object_bit(card_at_start);
+      set_first_start(card_at_start, offset_in_card);
+      set_last_start(card_at_start, offset_in_card);
     } else {
-      if (offset_in_card < getFirstStart(card_at_start))
-	setFirstStart(card_at_start, offset_in_card);
-      if (offset_in_card > getLastStart(card_at_start))
-	setLastStart(card_at_last, offset_in_card);
+      if (offset_in_card < get_first_start(card_at_start))
+	set_first_start(card_at_start, offset_in_card);
+      if (offset_in_card > get_last_start(card_at_start))
+	set_last_start(card_at_last, offset_in_card);
     }
 
 #ifdef SUPPORT_FOR_GET_CROSSING_OBJECT_START_NO_LONGER_REQUIRED
@@ -819,17 +819,17 @@ public:
 
     for (uint32_t card_to_update = card_at_start + 1;
 	 card_to_update < last_card_in_cluster; card_to_update++)
-      setCrossingObjectStart(card_to_update, crossing_map_within_cluster);
+      set_crossing_object_start(card_to_update, crossing_map_within_cluster);
 
     // If the last card region of this cluster is completely spanned
     // by this new object,  set its crossing object start as well.
     if (cluster_at_end > cluster_at_start) {
-      setCrossingObjectStart(card_to_update++, crossing_map_within_cluster);
+      set_crossing_object_start(card_to_update++, crossing_map_within_cluster);
 
       // Now, we have to update all spanned cards that reside within the
       // following clusters.
       while (card_to_update < card_at_end)
-	setCrossingObjectStart(card_to_update++, CrossingObjectOverflow);
+	set_crossing_object_start(card_to_update++, CrossingObjectOverflow);
 
       // Cases:
       //
@@ -887,35 +887,35 @@ public:
   // associated with addr p.
   // Returns true iff an object is known to start within the card memory
   // associated with addr p.
-  bool hasObject(uint32_t card_no);
+  bool has_object(uint32_t card_index);
 
-  // If hasObject(card_no), this returns the word offset within this card
+  // If has_object(card_index), this returns the word offset within this card
   // memory at which the first object begins.
-  uint32_t getFirstStart(uint32_t card_no);
+  uint32_t get_first_start(uint32_t card_index);
 
-  // If hasObject(card_no), this returns the word offset within this card
+  // If has_object(card_index), this returns the word offset within this card
   // memory at which the last object begins.
-  uint32_t getLastStart(uint32_t card_no);
+  uint32_t get_last_start(uint32_t card_index);
 
-  // If !hasObject(card_no), this returns the offset within the
+  // If !has_object(card_index), this returns the offset within the
   // enclosing cluster at which the object spanning the start of this
   // card memory begins, or returns 0x7fff if the spanning object
   // starts before the enclosing cluster.
-  uint32_t getCrossingObjectStart(uint32_t card_no);
+  uint32_t get_crossing_object_start(uint32_t card_index);
 
-  uint32_t cardNoForAddr(HeapWord *p);
-  HeapWord *addrForCardNo(uint32_t card_no);
-  bool isCardDirty(uint32_t card_no);
-  void markCardAsDirty(uint32_t card_no);
-  void markCardAsClean(uint32_t card_no);
-  void markOverreachCardAsDirty(uint32_t card_no);
-  bool isCardDirty(HeapWord *p);
-  void markCardAsDirty(HeapWord *p);
-  void markCardAsClean(HeapWord *p);
-  void markOverreachCardAsDirty(void *p);
-  uint32_t clusterCount();
-  void initializeOverreach(uint32_t first_cluster, uint32_t count);
-  inline void mergeOverreach(uint32_t first_cluster, uint32_t count);
+  uint32_t card_index_for_addr(HeapWord *p);
+  HeapWord *addr_for_card_index(uint32_t card_index);
+  bool is_card_dirty(uint32_t card_index);
+  void mark_card_as_dirty(uint32_t card_index);
+  void mark_card_as_clean(uint32_t card_index);
+  void mark_overreach_card_as_dirty(uint32_t card_index);
+  bool is_card_dirty(HeapWord *p);
+  void mark_card_as_dirty(HeapWord *p);
+  void mark_card_as_clean(HeapWord *p);
+  void mark_overreach_card_as_dirty(void *p);
+  uint32_t cluster_count();
+  void initialize_overreach(uint32_t first_cluster, uint32_t count);
+  void merge_overreach(uint32_t first_cluster, uint32_t count);
 };
 
 // ShenandoahScanRemembered is a concrete class representing the
