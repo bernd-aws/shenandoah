@@ -56,11 +56,15 @@ private:
                                     bool tosca_live,
                                     bool expand_call);
 
+  void store_check(MacroAssembler* masm, Register obj, Address dst);
+
   void load_reference_barrier_not_null(MacroAssembler* masm, Register dst, Address src);
 
   void storeval_barrier_impl(MacroAssembler* masm, Register dst, Register tmp);
 
   address generate_shenandoah_lrb(StubCodeGenerator* cgen);
+
+  void gen_write_ref_array_post_barrier(MacroAssembler* masm, DecoratorSet decorators, Register addr, Register count, Register tmp);
 
 public:
   static address shenandoah_lrb();
@@ -88,7 +92,6 @@ public:
   virtual void try_resolve_jobject_in_native(MacroAssembler* masm, Register jni_env,
                                              Register obj, Register tmp, Label& slowpath);
   virtual void barrier_stubs_init();
-
 };
 
 #endif // CPU_X86_GC_SHENANDOAH_SHENANDOAHBARRIERSETASSEMBLER_X86_HPP

@@ -73,6 +73,18 @@ private:
                                     Node* pre_val,
                                     BasicType bt) const;
 
+  Node* byte_map_base_node(GraphKit* kit) const;
+
+  void post_barrier(GraphKit* kit,
+                    Node* ctl,
+                    Node* store,
+                    Node* obj,
+                    Node* adr,
+                    uint adr_idx,
+                    Node* val,
+                    BasicType bt,
+                    bool use_precise) const;
+
   Node* shenandoah_enqueue_barrier(GraphKit* kit, Node* val) const;
   Node* shenandoah_storeval_barrier(GraphKit* kit, Node* obj) const;
 
