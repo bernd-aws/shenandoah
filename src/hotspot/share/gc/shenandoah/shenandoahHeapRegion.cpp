@@ -446,9 +446,7 @@ void ShenandoahHeapRegion::recycle() {
   set_update_watermark(bottom());
 
   make_empty();
-
-  // HEY! Should this `set_affiliation` to maintain affiliation accounting?
-  _affiliation = ShenandoahRegionAffiliation::FREE;
+  set_affiliation(FREE);
 
   if (ZapUnusedHeapArea) {
     SpaceMangler::mangle_region(MemRegion(bottom(), end()));
@@ -721,13 +719,15 @@ public:
 void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affiliation) {
   shenandoah_assert_heaplocked_or_safepoint();
 
-  if (_affiliation == new_affiliation) {
+  ShenandoahHeap* heap = ShenandoahHeap::heap();
+  if (!heap->mode()->is_generational() || _affiliation == new_affiliation) {
     return;
   }
-  ShenandoahHeap* heap = ShenandoahHeap::heap();
+
   if (_affiliation == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
       heap->young_generation()->decrement_affiliated_region_count();
   }
+
   CardTable* card_table = ShenandoahBarrierSet::barrier_set()->card_table();
   switch (new_affiliation) {
     case FREE:
