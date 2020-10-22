@@ -212,13 +212,13 @@ jint ShenandoahHeap::initialize() {
   //
   // After reserving the Java heap, create the card table, barriers, and workers, in dependency order
   //
+  BarrierSet::set_barrier_set(new ShenandoahBarrierSet(this, _heap_region));
   if (mode()->is_generational()) {
     ShenandoahDirectCardMarkRememberedSet *rs;
     size_t card_count = ShenandoahBarrierSet::barrier_set()->card_table()->cards_required(heap_rs.size() / HeapWordSize) - 1;
     rs = new ShenandoahDirectCardMarkRememberedSet(ShenandoahBarrierSet::barrier_set()->card_table(), card_count);
     _card_scan = new ShenandoahScanRemembered<ShenandoahDirectCardMarkRememberedSet>(rs);
   }
-  BarrierSet::set_barrier_set(new ShenandoahBarrierSet(this, _heap_region));
 
   _workers = new ShenandoahWorkGang("Shenandoah GC Threads", _max_workers,
                             /* are_GC_task_threads */ true,
