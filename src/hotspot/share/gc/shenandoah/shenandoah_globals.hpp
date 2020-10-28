@@ -322,10 +322,6 @@
   product(bool, ShenandoahSuspendibleWorkers, false, EXPERIMENTAL,          \
           "Suspend concurrent GC worker threads at safepoints")             \
                                                                             \
-  product(bool, ShenandoahUseSimpleCardScanning, false, EXPERIMENTAL,       \
-          "Testing: use simplified, very inefficient but much less complex" \
-          " card table scanning.")                                          \
-                                                                            \
   product(bool, ShenandoahSATBBarrier, true, DIAGNOSTIC,                    \
           "Turn on/off SATB barriers in Shenandoah")                        \
                                                                             \
@@ -349,7 +345,19 @@
                                                                             \
   product(bool, ShenandoahSelfFixing, true, DIAGNOSTIC,                     \
           "Fix references with load reference barrier. Disabling this "     \
-          "might degrade performance.")
+          "might degrade performance.")                                     \
+                                                                            \
+  product(bool, ShenandoahUseSimpleCardScanning, false, DIAGNOSTIC,         \
+          "Testing: use simplified, very inefficient but much less complex" \
+          " card table scanning.")                                          \
+                                                                            \
+  product(bool, ShenandoahPromoteTenuredObjects, true, DIAGNOSTIC,          \
+          "Turn on/off evacuating individual tenured young objects "        \
+          " to the old generation.")                                        \
+                                                                            \
+  product(bool, ShenandoahPromoteTenuredRegions, true, DIAGNOSTIC,          \
+          "Turn on/off transitioning tenured young regions "                \
+          " to the old generation.")                                        \
 
 // end of GC_SHENANDOAH_FLAGS
 

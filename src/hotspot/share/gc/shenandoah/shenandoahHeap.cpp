@@ -2578,7 +2578,7 @@ void ShenandoahHeap::op_final_updaterefs() {
     _free_set->rebuild();
   }
 
-  {
+  if (ShenandoahPromoteTenuredRegions) {
     ShenandoahGCPhase phase(ShenandoahPhaseTimings::final_update_refs_promote_tenured_regions);
     ShenandoahHeapLocker locker(lock());
     young_generation()->promote_tenured_regions();

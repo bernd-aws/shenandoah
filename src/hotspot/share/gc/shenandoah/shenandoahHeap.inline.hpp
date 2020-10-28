@@ -271,7 +271,7 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
       // Already forwarded.
       return ShenandoahBarrierSet::resolve_forwarded(p);
     } else {
-      if (mark.age() >= InitialTenuringThreshold) {
+      if (ShenandoahPromoteTenuredObjects && mark.age() >= InitialTenuringThreshold) {
         oop result = try_evacuate_object(p, thread, r, OLD_GENERATION);
         if (result != NULL) {
           // TODO: Just marking the cards covering this object dirty
