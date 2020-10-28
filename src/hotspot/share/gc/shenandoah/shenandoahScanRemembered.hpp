@@ -125,7 +125,7 @@
 //      cluster, each thread making a series of invocations of the
 //      following: 
 //
-//        rs->processClusters(cluster_no, cluster_count,
+//        rs->process_clusters(cluster_no, cluster_count,
 //		              OopClosure *oops);
 //        // Use the same approach for invocations of replaceClusters()
 //
@@ -490,7 +490,7 @@ public:
   //              region.
   //
   // In the most recent implementation of
-  //   ShenandoahScanRemembered::processClusters(),
+  //   ShenandoahScanRemembered::process_clusters(),
   // there is no need for the get_crossing_object_start() method
   // function, so there is no need to maintain the following
   // information.  The comment is left in place for now in case we
@@ -876,31 +876,31 @@ public:
   ShenandoahScanRemembered(RememberedSet *rs);
   ~ShenandoahScanRemembered();
 
-  // processClusters() scans a portion of the remembered set during a JVM
+  // process_clusters() scans a portion of the remembered set during a JVM
   // safepoint as part of the root scanning activities that serve to
   // initiate concurrent scanning and concurrent evacuation.  Multiple
   // threads may scan different portions of the remembered set by
-  // making parallel invocations of processClusters() with each
+  // making parallel invocations of process_clusters() with each
   // invocation scanning different clusters of the remembered set.
   //
-  // An invocation of processClusters() examines all of the
+  // An invocation of process_clusters() examines all of the
   // intergenerational references spanned by count clusters starting
   // with first_cluster.  The oops argument is assumed to represent a
   // thread-local OopClosure into which addresses of intergenerational
   // pointer values will be accumulated for the purposes of root scanning.
   //
-  // A side effect of executing processClusters() is to update the card
+  // A side effect of executing process_clusters() is to update the card
   // table entries, marking dirty cards as clean if they no longer
   // hold references to young-gen memory.  (THIS IS NOT YET IMPLEMENTED.)
   //
-  // The implementation of processClusters() is designed to efficiently
+  // The implementation of process_clusters() is designed to efficiently
   // minimize work in the large majority of cases for which the
   // associated cluster has very few dirty card-table entries.
   //
-  // At initialization of concurrent marking, invoke processClusters with
+  // At initialization of concurrent marking, invoke process_clusters with
   // ClosureType equal to ShenandoahInitMarkRootsClosure.
   //
-  // At initialization of concurrent evacuation, invoke processClusters with
+  // At initialization of concurrent evacuation, invoke process_clusters with
   // ClosureType equal to ShenandoahEvacuateUpdateRootsClosure.
 
   // This is big enough it probably shouldn't be in-lined.  On the other hand, there are only a few places this

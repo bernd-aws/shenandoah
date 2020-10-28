@@ -151,8 +151,14 @@ public:
             if (region->affiliation() == OLD_GENERATION) {
               uint32_t start_cluster_no = rs->cluster_for_addr(region->bottom());
               uint32_t stop_cluster_no  = rs->cluster_for_addr(region->end());
-              rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(worker_id, rp, _scm,
-                           start_cluster_no, stop_cluster_no + 1 - start_cluster_no, &mark_cl);
+
+	      // TODO:
+	      // kelvin wonders if we need to pass region->end() in as an argument to enforce that we scan no further than that.
+	      // otherwise, we may be scanning random noise that sits within this region beyond the point that has been allocated
+	      // and initialized.
+
+              rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(worker_id, rp, _scm, start_cluster_no,
+										       stop_cluster_no + 1 - start_cluster_no, &mark_cl);
             }
           }
         }

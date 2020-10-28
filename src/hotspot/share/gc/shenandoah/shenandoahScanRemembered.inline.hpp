@@ -38,7 +38,7 @@
 
 inline uint32_t
 ShenandoahDirectCardMarkRememberedSet::card_index_for_addr(HeapWord *p) {
-  return (uint32_t) (uintptr_t(p) >> _card_shift);
+  return (uint32_t) _card_table->index_for(p);
 }
 
 inline HeapWord *
@@ -113,8 +113,11 @@ ShenandoahCardCluster<RememberedSet>::has_object(uint32_t card_index) {
   HeapWord *addr = _rs->addr_for_card_index(card_index);
   ShenandoahHeap *heap = ShenandoahHeap::heap();
   ShenandoahHeapRegion *region = heap->heap_region_containing(addr);
+
   HeapWord *obj = region->block_start(addr);
-  
+
+  // addr is the first address of the card region.
+  // obj is the object that spans addr (or starts at addr).
   assert(obj != NULL, "Object cannot be null");
   if (obj >= addr)
     return true;
@@ -283,11 +286,8 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint worker_id, Refere
   // be marked and then subsequently scanned.
 
   while (count-- > 0) {
-    uint32_t card_index = first_cluster *
-	ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
-    uint32_t end_card_index = card_index +
-	ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
-
+    uint32_t card_index = first_cluster * ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
+    uint32_t end_card_index = card_index + ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
     while (card_index < end_card_index) {
      if (_scc->is_card_dirty(card_index)) {
        if (_scc->has_object(card_index)) {
@@ -305,7 +305,7 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint worker_id, Refere
 	   // particular, in that case, we might want to divide the effort for scanning of a very long object array
 	   // between multiple threads.
 	   if (obj->is_objArray()) {
-             ShenandoahObjToScanQueue* q = cm->get_queue(worker_id); // kelvin to confirm: get_queue wants worker_id
+             ShenandoahObjToScanQueue* q = cm->get_queue(worker_id);
              ShenandoahMarkRefsClosure<YOUNG> cl(q, rp);
              objArrayOop array = objArrayOop(obj);
 	     int len = array->length();
@@ -362,7 +362,8 @@ template<typename RememberedSet>
 inline uint32_t
 ShenandoahScanRemembered<RememberedSet>::cluster_for_addr(HeapWordImpl **addr) {
   uint32_t card_index = _scc->card_index_for_addr(addr);
-  return card_index / ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
+  uint32_t result = card_index / ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
+  return result;
 }
 
 #endif   // SHARE_GC_SHENANDOAH_SHENANDOAHSCANREMEMBEREDINLINE_HPP
