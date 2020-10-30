@@ -265,24 +265,26 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
   assert(!r->is_humongous(), "never evacuate humongous objects");
 
   ShenandoahRegionAffiliation target_gen = r->affiliation();
-  if (mode()->is_generational() && target_gen == YOUNG_GENERATION) {
+  if (mode()->is_generational() && ShenandoahPromoteTenuredObjects && target_gen == YOUNG_GENERATION) {
     markWord mark = p->mark();
     if (mark.is_marked()) {
       // Already forwarded.
       return ShenandoahBarrierSet::resolve_forwarded(p);
-    } else {
-      if (ShenandoahPromoteTenuredObjects && mark.age() >= InitialTenuringThreshold) {
-        oop result = try_evacuate_object(p, thread, r, OLD_GENERATION);
-        if (result != NULL) {
-          // TODO: Just marking the cards covering this object dirty
-          // may overall be less efficient than scanning it now for references to young gen
-          // or other alternatives like deferred card marking or scanning.
-          // We should revisit this.
-          // Furthermore, the object start should be registered for remset scanning.
-          MemRegion mr(cast_from_oop<HeapWord*>(p), p->size());
-          ShenandoahBarrierSet::barrier_set()->card_table()->invalidate(mr);
-          return result;
-        }
+    }
+    if (mark.has_displaced_mark_helper()) {
+      // We don't want to deal with MT here just to ensure we read the right mark word.
+      // Skip the potential promotion attempt for this one.
+    } else if (mark.age() >= InitialTenuringThreshold) {
+      oop result = try_evacuate_object(p, thread, r, OLD_GENERATION);
+      if (result != NULL) {
+        // TODO: Just marking the cards covering this object dirty
+        // may overall be less efficient than scanning it now for references to young gen
+        // or other alternatives like deferred card marking or scanning.
+        // We should revisit this.
+        // Furthermore, the object start should be registered for remset scanning.
+        MemRegion mr(cast_from_oop<HeapWord*>(p), p->size());
+        ShenandoahBarrierSet::barrier_set()->card_table()->invalidate(mr);
+        return result;
       }
     }
   }
