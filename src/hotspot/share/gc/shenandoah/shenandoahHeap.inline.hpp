@@ -444,6 +444,9 @@ template<class T>
 inline void ShenandoahHeap::marked_object_iterate(ShenandoahHeapRegion* region, T* cl, HeapWord* limit) {
   assert(! region->is_humongous_continuation(), "no humongous continuation regions here");
 
+  printf("marked_object_iterate() for region spanning %llx to %llx\n", 
+	 (unsigned long long) region->bottom(), (unsigned long long) region->end());
+
   ShenandoahMarkingContext* const ctx = complete_marking_context();
   assert(ctx->is_complete(), "sanity");
 

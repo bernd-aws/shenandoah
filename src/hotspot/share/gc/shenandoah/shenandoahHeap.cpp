@@ -2421,21 +2421,69 @@ public:
     if (_concurrent) {
       ShenandoahConcurrentWorkerSession worker_session(worker_id);
       ShenandoahSuspendibleThreadSetJoiner stsj(ShenandoahSuspendibleWorkers);
-      do_work();
+      do_work(worker_id);
     } else {
       ShenandoahParallelWorkerSession worker_session(worker_id);
-      do_work();
+      do_work(worker_id);
     }
   }
 
 private:
-  void do_work() {
+  void do_work(uint worker_id) {
     ShenandoahHeapRegion* r = _regions->next();
     ShenandoahMarkingContext* const ctx = _heap->complete_marking_context();
+    
     while (r != NULL) {
       HeapWord* update_watermark = r->get_update_watermark();
       assert (update_watermark >= r->bottom(), "sanity");
-      if (r->is_active() && !r->is_cset()) {
+
+      // TODO: This code is quick and dirty replacement for JVM-292.  When JVM-292 is implemented,
+      //       remove this special handling.
+      if (r->is_active() && (r->affiliation() == ShenandoahRegionAffiliation::OLD_GENERATION) && !r->is_cset()) {
+
+        // Note that we use this code even if we are doing an old-gen collection and the old-gen collection
+	// and we have a bitmap to represent marked objects within the heap region.
+	//
+        // It is necessary to process all objects, rather than just the marked objects, during update-refs of
+        // an old-gen region as part of an old-gen collection.  Otherwise, a subseqent update-refs scan of
+	// the same region will see stale pointers and crash.
+	//
+        // Kelvin believes (but has not confirmed) the following:
+	//   r->top() represents the upper end of memory that has been allocated within this region.
+        //       As new objects are allocated, the value of r->top() increases to accomodate each new
+	//       object.
+	//   r->get_update_watermark() represents the value that was held in r->top() at the start of
+        //       evacuation.  During evacuation, new objects may be allocated within this heap region
+	//       and this will cause r->top() to increase.  But any objects allocated during the evacuation
+	//       phase do not need to be scanned by update-refs because the to-space invariant is in force
+	//       during evacuation and this will assure that any objects residing between
+	//       r->get_update_watermark() and r->top() hold no pointers to from-space.
+	  
+
+	HeapWord *p = r->bottom();
+        ShenandoahObjectToOopBoundedClosure<T> objs(&cl, p, update_watermark);
+
+	// TODO: This code assumes every object ever allocated within this old-gen region is still live.  If we
+	// allow a sweep phase to turn garbage objects into free memory regions, we need to modify this code to
+	// skip over and/or synchronize access to these free memory regions.  There might be races, for example,
+	// if we are trying to scan one of these free memory regions while a different thread is trying to
+	// allocate from within a free region.
+	//
+	// Reality is that this code is likely to be replaced with JVM-292 code before we ever get around to
+	// sweeping up garbage objects within old-gen memory.
+
+	// Anything beyond update_watermark is not yet allocated or initialized
+        while (p < update_watermark) {
+	  oop obj = oop(p);
+
+	  // The invocation of do_object() is "borrowed" from the implementation of
+	  // ShenandoahHeap::marked_object_iterate(), which is called by _heap->marked_object_oop_iterate().
+	  objs.do_object(obj);
+	  p += obj->size();
+
+	}
+      }
+      else if (r->is_active() && !r->is_cset()) {
         _heap->marked_object_oop_iterate(r, &cl, update_watermark);
       }
       if (ShenandoahPacing) {

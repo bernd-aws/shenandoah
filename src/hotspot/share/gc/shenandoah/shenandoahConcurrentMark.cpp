@@ -150,15 +150,22 @@ public:
             ShenandoahHeapRegion *region = heap->get_region(r);
             if (region->affiliation() == OLD_GENERATION) {
               uint32_t start_cluster_no = rs->cluster_for_addr(region->bottom());
-              uint32_t stop_cluster_no  = rs->cluster_for_addr(region->end());
 
-	      // TODO:
-	      // kelvin wonders if we need to pass region->end() in as an argument to enforce that we scan no further than that.
-	      // otherwise, we may be scanning random noise that sits within this region beyond the point that has been allocated
-	      // and initialized.
+	      // region->end() represents the end of memory spanned by this region, but not all of this
+	      //   memory is eligible to be scanned because some of this memory has not yet been allocated.
+	      //
+	      // region->top() represents the end of allocated memory within this region.  Any addresses
+	      //   beyond region->top() should not be scanned as that memory does not hold valid objects.
+	      HeapWord *end_of_range = region->top();
+              uint32_t stop_cluster_no  = rs->cluster_for_addr(end_of_range);
+
+	      
+	      printf("preparing to issue invocation of process_clusters for worker: %u, start_cluster_no: %u, stop_cluster_no: %u\n",
+		     worker_id, start_cluster_no, stop_cluster_no);
 
               rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(worker_id, rp, _scm, start_cluster_no,
-										       stop_cluster_no + 1 - start_cluster_no, &mark_cl);
+										       stop_cluster_no + 1 - start_cluster_no,
+										       end_of_range, &mark_cl);
             }
           }
         }

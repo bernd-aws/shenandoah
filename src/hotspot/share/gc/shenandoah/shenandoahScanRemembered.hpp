@@ -125,8 +125,9 @@
 //      cluster, each thread making a series of invocations of the
 //      following: 
 //
-//        rs->process_clusters(cluster_no, cluster_count,
-//		              OopClosure *oops);
+//        rs->process_clusters(worker_id, ReferenceProcessor *,
+//		              ShenandoahConcurrentMark *, cluster_no, cluster_count,
+//		              HeapWord *end_of_range, OopClosure *oops);
 //        // Use the same approach for invocations of replaceClusters()
 //
 //      Divide up the clusters so that different threads are
@@ -435,7 +436,7 @@ public:
 // and also keeps track of crossing map information to allow efficient
 // resolution of object start addresses.
 //
-// ShenandoahCardClusters supports all of the services of
+// ShenandoahCardCluster supports all of the services of
 // RememberedSet, plus it supports register_object() and lookup_object().
 //
 // There are two situations under which we need to know the location
@@ -908,13 +909,14 @@ public:
   // the template expansions were making it difficult for the link/loader to resolve references to the template-
   // parameterized implementations of this service.
   template <typename ClosureType>
-  void process_clusters(uint worker_id, ReferenceProcessor* rp, ShenandoahConcurrentMark* cm, uint32_t first_cluster, uint32_t count, ClosureType *oops);
+  void process_clusters(uint worker_id, ReferenceProcessor* rp, ShenandoahConcurrentMark* cm, uint32_t first_cluster, uint32_t count,
+			HeapWord *end_of_range, ClosureType *oops);
 
   uint32_t cluster_for_addr(HeapWord *addr);
 
   // To Do:
   //  Create subclasses of ShenandoahInitMarkRootsClosure and
-  //  ShenandoahEvacuateUpdateRoootsClosure and any other closures
+  //  ShenandoahEvacuateUpdateRootsClosure and any other closures
   //  that need to participate in remembered set scanning.  Within the
   //  subclasses, add a (probably templated) instance variable that
   //  refers to the associated ShenandoahCardCluster object.  Use this

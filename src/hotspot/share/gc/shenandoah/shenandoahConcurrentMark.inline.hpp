@@ -223,6 +223,7 @@ public:
 
 template<class T, GenerationMode GENERATION, UpdateRefsMode UPDATE_REFS, StringDedupMode STRING_DEDUP>
 inline void ShenandoahConcurrentMark::mark_through_ref(T *p, ShenandoahHeap* heap, ShenandoahObjToScanQueue* q, ShenandoahMarkingContext* const mark_context) {
+
   T o = RawAccess<>::oop_load(p);
   if (!CompressedOops::is_null(o)) {
     oop obj = CompressedOops::decode_not_null(o);
