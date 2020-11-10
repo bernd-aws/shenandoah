@@ -46,7 +46,7 @@ ShenandoahDirectCardMarkRememberedSet::ShenandoahDirectCardMarkRememberedSet(Car
 
   _overreach_map = (uint8_t *) malloc(total_card_count);
   _overreach_map_base = (_overreach_map -
-			 (uintptr_t(_whole_heap_base) >> _card_shift));
+                         (uintptr_t(_whole_heap_base) >> _card_shift));
       
   assert(total_card_count % ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster == 0, "Invalid card count.");
   assert(total_card_count > 0, "Card count cannot be zero.");
@@ -126,14 +126,14 @@ uint32_t ShenandoahCardCluster<RememberedSet>::get_first_start(uint32_t card_ind
 {
   assert(object_starts[card_index] & ObjectStartsInCardRegion);
   return (((object_starts[card_index] & FirstStartBits) >> FirstStartShift) *
-	  CardWordOffsetMultiplier);
+          CardWordOffsetMultiplier);
 }
 
 template <class RememberedSet>
 uint32_t ShenandoahCardCluster<RememberedSet>::get_last_start(uint32_t card_index) {
   assert(object_starts[card_index] & ObjectStartsInCardRegion);
   return (((object_starts[card_index] & LastStartBits) >> LastStartShift) *
-	  CardWordOffsetMultiplier);
+          CardWordOffsetMultiplier);
 }
 
 template <class RememberedSet>

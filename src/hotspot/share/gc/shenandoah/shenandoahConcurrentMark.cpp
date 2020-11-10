@@ -159,10 +159,11 @@ public:
 	      HeapWord *end_of_range = region->top();
               uint32_t stop_cluster_no  = rs->cluster_for_addr(end_of_range);
 
-	      
+#ifdef DEBUG_TRACE
 	      printf("preparing to issue invocation of process_clusters for worker: %u, start_cluster_no: %u, stop_cluster_no: %u\n",
 		     worker_id, start_cluster_no, stop_cluster_no);
-
+              fflush(stdout);
+#endif
               rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(worker_id, rp, _scm, start_cluster_no,
 										       stop_cluster_no + 1 - start_cluster_no,
 										       end_of_range, &mark_cl);

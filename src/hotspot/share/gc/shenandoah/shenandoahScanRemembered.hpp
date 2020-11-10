@@ -126,8 +126,8 @@
 //      following: 
 //
 //        rs->process_clusters(worker_id, ReferenceProcessor *,
-//		              ShenandoahConcurrentMark *, cluster_no, cluster_count,
-//		              HeapWord *end_of_range, OopClosure *oops);
+//                            ShenandoahConcurrentMark *, cluster_no, cluster_count,
+//                            HeapWord *end_of_range, OopClosure *oops);
 //        // Use the same approach for invocations of replaceClusters()
 //
 //      Divide up the clusters so that different threads are
@@ -242,18 +242,19 @@ private:
   uint32_t _card_shift;
   size_t _total_card_count;
   uint32_t _cluster_count;
-  HeapWord *_whole_heap_base;
+  HeapWord *_whole_heap_base;   // Points to first HeapWord of data contained within heap memory
   HeapWord *_whole_heap_end;
-  uint8_t *_byte_map;
-  uint8_t *_byte_map_base;
-  uint8_t *_overreach_map;
-  uint8_t *_overreach_map_base;
+  uint8_t *_byte_map;           // Points to first entry within the card table
+  uint8_t *_byte_map_base;      // Points to byte_map minus the bias computed from address of heap memory
+    uint8_t *_overreach_map;	// Points to first entry within the overreach card table
+  uint8_t *_overreach_map_base; // Points to overreach_map minus the bias computed from address of heap memory
 
 public:
   // count is the number of cards represented by the card table.
   ShenandoahDirectCardMarkRememberedSet(CardTable *card_table, size_t total_card_count);
   ~ShenandoahDirectCardMarkRememberedSet();
 
+  // Card index is zero-based relative to _byte_map.
   uint32_t card_index_for_addr(HeapWord *p);
   HeapWord *addr_for_card_index(uint32_t card_index);
   bool is_card_dirty(uint32_t card_index);
@@ -712,9 +713,9 @@ public:
       set_last_start(card_at_start, offset_in_card);
     } else {
       if (offset_in_card < get_first_start(card_at_start))
-	set_first_start(card_at_start, offset_in_card);
+        set_first_start(card_at_start, offset_in_card);
       if (offset_in_card > get_last_start(card_at_start))
-	set_last_start(card_at_last, offset_in_card);
+        set_last_start(card_at_last, offset_in_card);
     }
 
 #ifdef SUPPORT_FOR_GET_CROSSING_OBJECT_START_NO_LONGER_REQUIRED
@@ -728,7 +729,7 @@ public:
     uint_16 crossing_map_within_cluster = address - cluster_at_start;
 
     for (uint32_t card_to_update = card_at_start + 1;
-	 card_to_update < last_card_in_cluster; card_to_update++)
+         card_to_update < last_card_in_cluster; card_to_update++)
       set_crossing_object_start(card_to_update, crossing_map_within_cluster);
 
     // If the last card region of this cluster is completely spanned
@@ -739,7 +740,7 @@ public:
       // Now, we have to update all spanned cards that reside within the
       // following clusters.
       while (card_to_update < card_at_end)
-	set_crossing_object_start(card_to_update++, CrossingObjectOverflow);
+        set_crossing_object_start(card_to_update++, CrossingObjectOverflow);
 
       // Cases:
       //
@@ -813,6 +814,7 @@ public:
   // starts before the enclosing cluster.
   uint32_t get_crossing_object_start(uint32_t card_index);
 
+  // Card index is zero-based relative to first spanned card region.
   uint32_t card_index_for_addr(HeapWord *p);
   HeapWord *addr_for_card_index(uint32_t card_index);
   bool is_card_dirty(uint32_t card_index);
@@ -910,7 +912,7 @@ public:
   // parameterized implementations of this service.
   template <typename ClosureType>
   void process_clusters(uint worker_id, ReferenceProcessor* rp, ShenandoahConcurrentMark* cm, uint32_t first_cluster, uint32_t count,
-			HeapWord *end_of_range, ClosureType *oops);
+                        HeapWord *end_of_range, ClosureType *oops);
 
   uint32_t cluster_for_addr(HeapWord *addr);
 

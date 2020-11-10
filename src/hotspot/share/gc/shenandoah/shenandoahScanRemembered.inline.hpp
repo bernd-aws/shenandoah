@@ -26,6 +26,8 @@
 #ifndef SHARE_GC_SHENANDOAH_SHENANDOAHSCANREMEMBEREDINLINE_HPP
 #define SHARE_GC_SHENANDOAH_SHENANDOAHSCANREMEMBEREDINLINE_HPP
 
+#undef DEBUG_TRACE
+
 #include "memory/iterator.hpp"
 #include "oops/oop.hpp"
 #include "oops/objArrayOop.hpp"
@@ -48,26 +50,26 @@ ShenandoahDirectCardMarkRememberedSet::addr_for_card_index(uint32_t card_index) 
 
 inline bool 
 ShenandoahDirectCardMarkRememberedSet::is_card_dirty(uint32_t card_index) {
-  uint8_t *bp = &_byte_map_base[card_index];
+  uint8_t *bp = &_byte_map[card_index];
   return (bp[0] == CardTable::dirty_card_val());
 }
 
 inline void 
 ShenandoahDirectCardMarkRememberedSet::mark_card_as_dirty(uint32_t card_index) {
-  uint8_t *bp = &_byte_map_base[card_index];
+  uint8_t *bp = &_byte_map[card_index];
   bp[0] = CardTable::dirty_card_val();
 }
 
 inline void 
 ShenandoahDirectCardMarkRememberedSet::mark_card_as_clean(uint32_t card_index) {
-  uint8_t *bp = &_byte_map_base[card_index];
+  uint8_t *bp = &_byte_map[card_index];
   bp[0] = CardTable::clean_card_val();
 }
 
 inline void
 ShenandoahDirectCardMarkRememberedSet::mark_overreach_card_as_dirty(
     uint32_t card_index) {
-  uint8_t *bp = &_overreach_map_base[card_index];
+  uint8_t *bp = &_overreach_map[card_index];
   bp[0] = CardTable::dirty_card_val();
 }
 
@@ -110,17 +112,33 @@ ShenandoahCardCluster<RememberedSet>::card_index_for_addr(HeapWord *p) {
 template<typename RememberedSet>
 inline bool
 ShenandoahCardCluster<RememberedSet>::has_object(uint32_t card_index) {
+
+#ifdef DEBUG_TRACE
+  printf("has_object(%u),\n", card_index);
+  fflush(stdout);
+#endif
+  
   HeapWord *addr = _rs->addr_for_card_index(card_index);
 
-  printf("has_object(%u), range starts at %llx\n", card_index, (unsigned long long) addr);
+#ifdef DEBUG_TRACE
+  printf("  ... range starts at %llx\n", (unsigned long long) addr);
+  fflush(stdout);
+#endif
 
   ShenandoahHeap *heap = ShenandoahHeap::heap();
   ShenandoahHeapRegion *region = heap->heap_region_containing(addr);
 
+  // Apparently, region->block_start(addr) is not robust to inquiries beyond top() and it crashes.
+  if (region->top() <= addr)
+    return false;
+
   HeapWord *obj = region->block_start(addr);
 
-  printf(" back from region->block_start(addr), obj is %llx\n", (unsigned long long) obj);
-
+#ifdef DEBUG_TRACE
+  printf(" back from region->block_start(addr), obj is %llx of size %llx HeapWords\n",
+         (unsigned long long) obj, (unsigned long long) oop(obj)->size());
+  fflush(stdout);
+#endif
 
   // addr is the first address of the card region.
   // obj is the object that spans addr (or starts at addr).
@@ -129,6 +147,18 @@ ShenandoahCardCluster<RememberedSet>::has_object(uint32_t card_index) {
     return true;
   else {
     HeapWord *end_addr = addr + CardTable::card_size_in_words;
+
+    // end_addr needs to be adjusted downward if top address of the enclosing region is less than end_addr.  this is intended
+    // to be slow and reliable alternative to the planned production quality replacement, so go ahead and spend some extra
+    // cycles here in order to make this code reliable.
+    if (region->top() < end_addr) {
+#ifdef DEBUG_TRACE
+      printf(" truncating end_addr in has_object by %u HeapWords\n", (unsigned int) (end_addr - region->top()));
+      fflush(stdout);
+#endif
+      end_addr = region->top();
+    }
+
     obj += oop(obj)->size();
     if (obj < end_addr)
       return true;
@@ -184,8 +214,7 @@ template<typename RememberedSet>
 inline uint32_t
 ShenandoahCardCluster<RememberedSet>::get_crossing_object_start(uint32_t card_index) {
   HeapWord *addr = _rs->addr_for_card_index(card_index);
-  uint32_t cluster_no =
-      card_index / ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
+  uint32_t cluster_no = card_index / ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
   HeapWord *cluster_addr = _rs->addr_for_card_index(cluster_no * CardsPerCluster);
 
   HeapWord *end_addr = addr + CardTable::card_size_in_words;
@@ -285,146 +314,212 @@ template<typename RememberedSet>
 template <typename ClosureType>
 inline void 
 ShenandoahScanRemembered<RememberedSet>::process_clusters(uint worker_id, ReferenceProcessor* rp, ShenandoahConcurrentMark* cm,
-							  uint32_t first_cluster, uint32_t count, HeapWord *end_of_range,
-							  ClosureType *oops) {
+                                                          uint32_t first_cluster, uint32_t count, HeapWord *end_of_range,
+                                                          ClosureType *oops) {
 
   // Unlike traditional Shenandoah marking, the old-gen resident objects that are examined as part of the remembered set are not
   // themselves marked.  Each such object will be scanned only once.  Any young-gen objects referenced from the remembered set will
   // be marked and then subsequently scanned.
 
+#ifdef DEBUG_TRACE
   printf("%u: process_clusters first_cluster: %u, count: %u, end_of_range: %llx\n", worker_id, first_cluster, count,
-	 (unsigned long long) end_of_range);
+         (unsigned long long) end_of_range);
+  fflush(stdout);
+#endif
 
   while (count-- > 0) {
     uint32_t card_index = first_cluster * ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
     uint32_t end_card_index = card_index + ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
 
+#ifdef DEBUG_TRACE
     printf("%u: scanning first_cluster: %d, card_index: %u to end_card_index: %u\n",
-	   worker_id, first_cluster, card_index, end_card_index);
-
+           worker_id, first_cluster, card_index, end_card_index);
+    fflush(stdout);
+#endif
 
     first_cluster++;
     int next_card_index = 0;
     while (card_index < end_card_index) {
+#ifdef DEBUG_TRACE
       printf("%u: card_index %d, end_card_index: %d\n", worker_id, card_index, end_card_index);
+      fflush(stdout);
+#endif
 
-      if (_scc->is_card_dirty(card_index)) {
+      int is_dirty = _scc->is_card_dirty(card_index);
 
+#ifdef DEBUG_TRACE
+      printf("%u: is_dirty: %d\n", worker_id, is_dirty);
+      fflush(stdout);
+#endif
+      
+      int has_object = _scc->has_object(card_index);
+
+#ifdef DEBUG_TRACE
+      printf("%u: has_object: %d\n", worker_id, has_object);
+      fflush(stdout);
+#endif
+
+      if (is_dirty) {
+
+#ifdef DEBUG_TRACE
         printf("%u: card %u is dirty!\n", worker_id, card_index);
+        fflush(stdout);
+#endif
 
-	if (_scc->has_object(card_index)) {
+        if (has_object) {
 
-	  printf("%u: card has object\n", worker_id);
+#ifdef DEBUG_TRACE
+          printf("%u: card has object\n", worker_id);
+          fflush(stdout);
+#endif
 
-	  // Scan all objects that start within this card region.
-	  uint32_t start_offset = _scc->get_first_start(card_index);
-	  HeapWord *p = _scc->addr_for_card_index(card_index);
-	  HeapWord *endp = p + CardTable::card_size_in_words;
-	  if (endp > end_of_range) {
+          // Scan all objects that start within this card region.
+          uint32_t start_offset = _scc->get_first_start(card_index);
+          HeapWord *p = _scc->addr_for_card_index(card_index);
+          HeapWord *endp = p + CardTable::card_size_in_words;
+          if (endp > end_of_range) {
+#ifdef DEBUG_TRACE
+            printf("%u: truncating card memory region by %d HeapWords\n", worker_id, (unsigned int) (endp - end_of_range));
+            fflush(stdout);
+#endif
             endp = end_of_range;
-	    next_card_index = end_card_index;
-	  } else {
-  	    // endp either points to start of next card region, or to the next object that needs to be scanned, which may
-	    // reside in some successor card region.
+            next_card_index = end_card_index;
+          } else {
+            // endp either points to start of next card region, or to the next object that needs to be scanned, which may
+            // reside in some successor card region.
             next_card_index = _scc->card_index_for_addr(endp);
-	  }
+          }
 
-	  p += start_offset;
-	  
-	  printf("%u: scanning objects for memory region %llx to %llx, with first object at offset %u\n", 
-		 worker_id, (unsigned long long) p, (unsigned long long) endp, start_offset);
+          p += start_offset;
+          
+#ifdef DEBUG_TRACE
+          printf("%u: scanning objects for memory region %llx to %llx, with first object at offset %u\n", 
+                 worker_id, (unsigned long long) p, (unsigned long long) endp, start_offset);
+          fflush(stdout);
+#endif
+          while (p < endp) {
+            oop obj = oop(p);
 
-	  while (p < endp) {
-	    oop obj = oop(p);
-
-	    printf("%u: about to test for is_objArray() on object @%llx of size %u\n",
-		   worker_id, (unsigned long long) p, (unsigned) obj->size());
-
-	    // Future TODO:
-	    // For improved efficiency, we might want to give special handling of obj->is_objArray().  In
-	    // particular, in that case, we might want to divide the effort for scanning of a very long object array
-	    // between multiple threads.
-	    if (obj->is_objArray()) {
-	      printf("%u: it is an object array, so we'll iterate through its ", worker_id);
-		
-	      ShenandoahObjToScanQueue* q = cm->get_queue(worker_id);
-	      ShenandoahMarkRefsClosure<YOUNG> cl(q, rp);
-	      objArrayOop array = objArrayOop(obj);
-	      int len = array->length();
-	      
-	      printf("%d members\n", len);
-	      
-	      array->oop_iterate_range(&cl, 0, len);
-	    } else {
-	      printf("%u: it is not an object array, so we'll do_oop() on its reference\n", worker_id);
-
-	      oops->do_oop(&obj);
-	    }
-	    p += obj->size();
-	  }
-	  card_index = next_card_index;
-	} else {
-	  printf("%u: card does not have object\n", worker_id);
-	  // otherwise, this card will have been scanned during scan of a previous cluster.
-	  card_index++;
-	}
+#ifdef DEBUG_TRACE
+            printf("%u: about to test for is_objArray() on object @%llx of size %u\n",
+                   worker_id, (unsigned long long) p, (unsigned) obj->size());
+            fflush(stdout);
+#endif
+            // Future TODO:
+            // For improved efficiency, we might want to give special handling of obj->is_objArray().  In
+            // particular, in that case, we might want to divide the effort for scanning of a very long object array
+            // between multiple threads.
+            if (obj->is_objArray()) {
+#ifdef DEBUG_TRACE
+              printf("%u: it is an object array, so we'll iterate through its ", worker_id);
+              fflush(stdout);
+#endif                
+              ShenandoahObjToScanQueue* q = cm->get_queue(worker_id);
+              ShenandoahMarkRefsClosure<YOUNG> cl(q, rp);
+              objArrayOop array = objArrayOop(obj);
+              int len = array->length();
+              
+#ifdef DEBUG_TRACE
+              printf("%d members\n", len);
+              fflush(stdout);
+#endif
+              array->oop_iterate_range(&cl, 0, len);
+            } else {
+#ifdef DEBUG_TRACE
+              printf("%u: it is not an object array, so we'll do_oop() on its reference\n", worker_id);
+              fflush(stdout);
+#endif
+              oops->do_oop(&obj);
+            }
+            p += obj->size();
+          }
+          card_index = next_card_index;
+        } else {
+#ifdef DEBUG_TRACE
+          printf("%u: card does not have object\n", worker_id);
+          fflush(stdout);
+#endif
+          // otherwise, this card will have been scanned during scan of a previous cluster.
+          card_index++;
+        }
       } else if (_scc->has_object(card_index)) {
 
+#ifdef DEBUG_TRACE
         printf("%u: card is not dirty, but does have object\n", worker_id);
+        fflush(stdout);
+#endif
+        // Scan the last object that starts within this card memory if it spans at least one dirty card within this cluster
+        // or if it reaches into the next cluster. 
+        uint32_t start_offset = _scc->get_last_start(card_index);
+        HeapWord *p = _scc->addr_for_card_index(card_index) + start_offset;
+        oop obj = oop(p);
+        HeapWord *nextp = p + obj->size();
+        uint32_t last_card = _scc->card_index_for_addr(nextp);
+        
+        bool reaches_next_cluster = (last_card > end_card_index);
+        bool spans_dirty_within_this_cluster = false;
 
-	// Scan the last object that starts within this card memory if it spans at least one dirty card within this cluster
-	// or if it reaches into the next cluster. 
-	uint32_t start_offset = _scc->get_last_start(card_index);
-	HeapWord *p = _scc->addr_for_card_index(card_index) + start_offset;
-	oop obj = oop(p);
-	HeapWord *nextp = p + obj->size();
-	uint32_t last_card = _scc->card_index_for_addr(nextp);
-	
-	bool reaches_next_cluster = (last_card > end_card_index);
-	bool spans_dirty_within_this_cluster = false;
+        if (!reaches_next_cluster) {
+          uint32_t span_card;
+          for (span_card = card_index+1; span_card < end_card_index; span_card++)
+            if (_scc->is_card_dirty(span_card)) {
+              spans_dirty_within_this_cluster = true;
+              break;
+            }
+        }
+        
+#ifdef DEBUG_TRACE
+        printf("%u: last_start: %u, size: %d, p: %llx, nextp: %llx, reaches_next_cluster: %d, spans_dirty_within_this_cluster: %d\n",
+               worker_id, start_offset, (unsigned) obj->size(), (unsigned long long) p, (unsigned long long) nextp,
+               reaches_next_cluster, spans_dirty_within_this_cluster);
+        fflush(stdout);
+#endif
+        
+        if (reaches_next_cluster || spans_dirty_within_this_cluster) {
+          if (obj->is_objArray()) {
 
-	if (!reaches_next_cluster) {
-	  uint32_t span_card;
-	  for (span_card = card_index+1; span_card < end_card_index; span_card++)
-	    if (_scc->is_card_dirty(span_card)) {
-	      spans_dirty_within_this_cluster = true;
-	      break;
-	    }
-	}
-	
-	printf("%u: last_start: %u, size: %d, p: %llx, nextp: %llx, reaches_next_cluster: %d, spans_dirty_within_this_cluster: %d\n",
-	       worker_id, start_offset, (unsigned) obj->size(), (unsigned long long) p, (unsigned long long) nextp,
-	       reaches_next_cluster, spans_dirty_within_this_cluster);
-	
-	if (reaches_next_cluster || spans_dirty_within_this_cluster) {
-	  if (obj->is_objArray()) {
-
-	    printf("%u: it is an object array, so we'll iterate through its ", worker_id);
-
-	    ShenandoahObjToScanQueue* q = cm->get_queue(worker_id); // kelvin to confirm: get_queue wants worker_id
-	    ShenandoahMarkRefsClosure<YOUNG> cl(q, rp);
-	    objArrayOop array = objArrayOop(obj);
-	    int len = array->length();
-	    
-	    printf("%d members\n", len);
-
-	    array->oop_iterate_range(&cl, 0, len);
-	  } else {
-	    printf("%u: is is not an object array, so we'll do_oop() on its reference\n", worker_id);
-	    oops->do_oop(&obj);
-	  }
-	} else {
-          printf("%u: does not rach next cluster and does not span dirty within this cluster\n", worker_id);
-	}
-	// Increment card_index to account for the spanning object, even if we didn't scan it.
-	card_index = last_card;
+#ifdef DEBUG_TRACE
+            printf("%u: it is an object array, so we'll iterate through its ", worker_id);
+            fflush(stdout);
+#endif
+            ShenandoahObjToScanQueue* q = cm->get_queue(worker_id); // kelvin to confirm: get_queue wants worker_id
+            ShenandoahMarkRefsClosure<YOUNG> cl(q, rp);
+            objArrayOop array = objArrayOop(obj);
+            int len = array->length();
+            
+#ifdef DEBUG_TRACE
+            printf("%d members\n", len);
+            fflush(stdout);
+#endif
+            array->oop_iterate_range(&cl, 0, len);
+          } else {
+#ifdef DEBUG_TRACE
+            printf("%u: is is not an object array, so we'll do_oop() on its reference\n", worker_id);
+            fflush(stdout);
+#endif
+            oops->do_oop(&obj);
+          }
+        } else {
+#ifdef DEBUG_TRACE
+          printf("%u: does not reach next cluster and does not span dirty within this cluster\n", worker_id);
+          fflush(stdout);
+#endif
+        }
+        // Increment card_index to account for the spanning object, even if we didn't scan it.
+        card_index = last_card;
       } else {
-	printf("%u: card is not dirty, and card does not have object\n", worker_id);
-	card_index++;
+#ifdef DEBUG_TRACE
+        printf("%u: card is not dirty, and card does not have object\n", worker_id);
+        fflush(stdout);
+#endif
+        card_index++;
       }
     }
   }
+#ifdef DEBUG_TRACE
   printf("Returning from process_clusters\n");
+  fflush(stdout);
+#endif
 }
 
 template<typename RememberedSet>
