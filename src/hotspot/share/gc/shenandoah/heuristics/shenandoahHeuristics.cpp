@@ -98,8 +98,7 @@ void ShenandoahHeuristics::choose_collection_set(ShenandoahCollectionSet* collec
 
   for (size_t i = 0; i < num_regions; i++) {
     ShenandoahHeapRegion* region = heap->get_region(i);
-    if (heap->mode()->is_generational() && !region->is_young()) {
-      // TODO: "generational" means young collection only for now.
+    if (heap->is_gc_generation_young() && region->is_old()) {
       continue;
     }
 

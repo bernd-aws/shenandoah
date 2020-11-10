@@ -29,6 +29,7 @@
 #include "gc/shared/gcTrace.hpp"
 #include "gc/shared/gcWhen.hpp"
 #include "gc/shenandoah/shenandoahCollectorPolicy.hpp"
+#include "gc/shenandoah/shenandoahGeneration.hpp"
 #include "gc/shenandoah/shenandoahMarkCompact.hpp"
 #include "gc/shenandoah/shenandoahHeap.inline.hpp"
 #include "gc/shenandoah/shenandoahUtils.hpp"
@@ -37,13 +38,14 @@
 
 ShenandoahPhaseTimings::Phase ShenandoahTimingsTracker::_current_phase = ShenandoahPhaseTimings::_invalid_phase;
 
-ShenandoahGCSession::ShenandoahGCSession(GCCause::Cause cause) :
+ShenandoahGCSession::ShenandoahGCSession(GCCause::Cause cause, ShenandoahGeneration* generation) :
   _heap(ShenandoahHeap::heap()),
   _timer(_heap->gc_timer()),
   _tracer(_heap->tracer()) {
   assert(!ShenandoahGCPhase::is_current_phase_valid(), "No current GC phase");
 
   _heap->set_gc_cause(cause);
+  _heap->set_gc_generation(generation);
   _timer->register_gc_start();
   _tracer->report_gc_start(cause, _timer->gc_start());
   _heap->trace_heap_before_gc(_tracer);
@@ -69,6 +71,7 @@ ShenandoahGCSession::~ShenandoahGCSession() {
   _tracer->report_gc_end(_timer->gc_end(), _timer->time_partitions());
   assert(!ShenandoahGCPhase::is_current_phase_valid(), "No current GC phase");
   _heap->set_gc_cause(GCCause::_no_gc);
+  _heap->set_gc_generation(NULL);
 }
 
 ShenandoahGCPauseMark::ShenandoahGCPauseMark(uint gc_id, SvcGCMarker::reason_type type) :

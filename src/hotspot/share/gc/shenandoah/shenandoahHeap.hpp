@@ -130,11 +130,18 @@ class ShenandoahHeap : public CollectedHeap {
 //
 private:
   ShenandoahHeapLock _lock;
+  ShenandoahGeneration* _gc_generation;
 
 public:
   ShenandoahHeapLock* lock() {
     return &_lock;
   }
+
+  void set_gc_generation(ShenandoahGeneration* generation) {
+    _gc_generation = generation;
+  }
+
+  bool is_gc_generation_young() const;
 
 // ---------- Initialization, termination, identification, printing routines
 //

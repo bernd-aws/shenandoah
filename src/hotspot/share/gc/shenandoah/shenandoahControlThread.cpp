@@ -407,7 +407,7 @@ void ShenandoahControlThread::service_concurrent_global_cycle(GCCause::Cause cau
   if (check_cancellation_or_degen(ShenandoahHeap::_degenerated_outside_cycle)) return;
 
   GCIdMark gc_id_mark;
-  ShenandoahGCSession session(cause);
+  ShenandoahGCSession session(cause, generation);
 
   TraceCollectorStats tcs(heap->monitoring_support()->concurrent_collection_counters());
 
@@ -492,7 +492,7 @@ void ShenandoahControlThread::service_concurrent_young_cycle(GCCause::Cause caus
   if (check_cancellation_or_degen(ShenandoahHeap::_degenerated_outside_cycle)) return;
 
   GCIdMark gc_id_mark;
-  ShenandoahGCSession session(cause);
+  ShenandoahGCSession session(cause, generation);
 
   TraceCollectorStats tcs(heap->monitoring_support()->concurrent_collection_counters());
 
@@ -592,9 +592,9 @@ void ShenandoahControlThread::stop_service() {
 
 void ShenandoahControlThread::service_stw_full_cycle(GCCause::Cause cause) {
   GCIdMark gc_id_mark;
-  ShenandoahGCSession session(cause);
-
   ShenandoahHeap* heap = ShenandoahHeap::heap();
+  ShenandoahGCSession session(cause, heap->global_generation());
+
   heap->vmop_entry_full(cause);
 
   heap->heuristics()->record_success_full();
@@ -605,9 +605,9 @@ void ShenandoahControlThread::service_stw_degenerated_cycle(GCCause::Cause cause
   assert (point != ShenandoahHeap::_degenerated_unset, "Degenerated point should be set");
 
   GCIdMark gc_id_mark;
-  ShenandoahGCSession session(cause);
-
   ShenandoahHeap* heap = ShenandoahHeap::heap();
+  ShenandoahGCSession session(cause, heap->global_generation());
+
   heap->vmop_degenerated(point);
 
   heap->heuristics()->record_success_degenerated();
