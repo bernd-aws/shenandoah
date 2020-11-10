@@ -89,7 +89,7 @@ void ShenandoahHeapRegion::report_illegal_transition(const char *method) {
 
 void ShenandoahHeapRegion::make_regular_allocation() {
   shenandoah_assert_heaplocked();
-
+  reset_age();
   switch (_state) {
     case _empty_uncommitted:
       do_commit();
@@ -107,7 +107,7 @@ void ShenandoahHeapRegion::make_regular_bypass() {
   shenandoah_assert_heaplocked();
   assert (ShenandoahHeap::heap()->is_full_gc_in_progress() || ShenandoahHeap::heap()->is_degenerated_gc_in_progress(),
           "only for full or degen GC");
-
+  reset_age();
   switch (_state) {
     case _empty_uncommitted:
       do_commit();
@@ -130,6 +130,7 @@ void ShenandoahHeapRegion::make_regular_bypass() {
 
 void ShenandoahHeapRegion::make_humongous_start() {
   shenandoah_assert_heaplocked();
+  reset_age();
   switch (_state) {
     case _empty_uncommitted:
       do_commit();
@@ -144,7 +145,7 @@ void ShenandoahHeapRegion::make_humongous_start() {
 void ShenandoahHeapRegion::make_humongous_start_bypass() {
   shenandoah_assert_heaplocked();
   assert (ShenandoahHeap::heap()->is_full_gc_in_progress(), "only for full GC");
-
+  reset_age();
   switch (_state) {
     case _empty_committed:
     case _regular:
@@ -159,6 +160,7 @@ void ShenandoahHeapRegion::make_humongous_start_bypass() {
 
 void ShenandoahHeapRegion::make_humongous_cont() {
   shenandoah_assert_heaplocked();
+  reset_age();
   switch (_state) {
     case _empty_uncommitted:
       do_commit();
@@ -173,7 +175,7 @@ void ShenandoahHeapRegion::make_humongous_cont() {
 void ShenandoahHeapRegion::make_humongous_cont_bypass() {
   shenandoah_assert_heaplocked();
   assert (ShenandoahHeap::heap()->is_full_gc_in_progress(), "only for full GC");
-
+  reset_age();
   switch (_state) {
     case _empty_committed:
     case _regular:
@@ -232,6 +234,7 @@ void ShenandoahHeapRegion::make_unpinned() {
 
 void ShenandoahHeapRegion::make_cset() {
   shenandoah_assert_heaplocked();
+  reset_age();
   switch (_state) {
     case _regular:
       set_state(_cset);
@@ -244,6 +247,7 @@ void ShenandoahHeapRegion::make_cset() {
 
 void ShenandoahHeapRegion::make_trash() {
   shenandoah_assert_heaplocked();
+  reset_age();
   switch (_state) {
     case _cset:
       // Reclaiming cset regions
@@ -269,6 +273,7 @@ void ShenandoahHeapRegion::make_trash_immediate() {
 
 void ShenandoahHeapRegion::make_empty() {
   shenandoah_assert_heaplocked();
+  reset_age();
   switch (_state) {
     case _trash:
       set_state(_empty_committed);
@@ -718,8 +723,6 @@ public:
 };
 
 void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affiliation) {
-  shenandoah_assert_heaplocked_or_safepoint();
-
   ShenandoahHeap* heap = ShenandoahHeap::heap();
   if (!heap->mode()->is_generational() || _affiliation == new_affiliation) {
     return;
@@ -740,7 +743,7 @@ void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affil
       break;
     case OLD_GENERATION:
       if (_affiliation == YOUNG_GENERATION) {
-        assert(SafepointSynchronize::is_at_safepoint(), "old gen card values must be updated in a safepoint");
+        assert(SafepointSynchronize::is_at_safepoint(), "must be at a safepoint");
         card_table->clear_MemRegion(MemRegion(_bottom, _end));
 
         UpdateOopCardValueClosure oop_closure(card_table);

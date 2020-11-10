@@ -25,6 +25,14 @@ void ShenandoahFinalMarkUpdateRegionStateClosure::heap_region_do(ShenandoahHeapR
       }
     }
 
+    if (r->top() != r->get_update_watermark()) {
+      // There have been allocations in this region since the last GC cycle.
+      // Any objects new to this region must not assimilate elevated age.
+      r->reset_age();
+    } else {
+      r->increment_age();
+    }
+
     // Remember limit for updating refs. It's guaranteed that we get no
     // from-space-refs written from here on.
     r->set_update_watermark_at_safepoint(r->top());
@@ -32,10 +40,5 @@ void ShenandoahFinalMarkUpdateRegionStateClosure::heap_region_do(ShenandoahHeapR
     assert(!r->has_live(), "Region " SIZE_FORMAT " should have no live data", r->index());
     assert(_ctx->top_at_mark_start(r) == r->top(),
            "Region " SIZE_FORMAT " should have correct TAMS", r->index());
-
-    // We only age retired regions,
-    // so that objects do not assimilate the extra age of a region they get evacuated into.
-    // Here we err on the side of tenuring objects too late, to avoid promoting too early.
-    r->increment_age();
   }
 }

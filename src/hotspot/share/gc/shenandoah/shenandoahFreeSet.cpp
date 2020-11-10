@@ -310,8 +310,6 @@ HeapWord* ShenandoahFreeSet::allocate_contiguous(ShenandoahAllocRequest& req) {
       r->make_humongous_cont();
     }
 
-    r->set_affiliation(OLD_GENERATION); // Keep all humongous objects in old gen.
-
     // Trailing region may be non-full, record the remainder there
     size_t used_words;
     if ((i == end) && (remainder != 0)) {
