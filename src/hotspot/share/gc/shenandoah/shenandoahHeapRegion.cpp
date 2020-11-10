@@ -687,38 +687,31 @@ size_t ShenandoahHeapRegion::pin_count() const {
   return Atomic::load(&_critical_pins);
 }
 
-class UpdateOopCardValueClosure : public BasicOopIterateClosure {
+class UpdateCardValueClosure : public BasicOopIterateClosure {
+private:
   CardTable* _card_table;
 
-public:
-  UpdateOopCardValueClosure(CardTable *card_table) : _card_table(card_table) { }
-
-  void do_oop(oop* p) {
-    if (ShenandoahHeap::heap()->is_in_young(*p)) {
-      volatile CardTable::CardValue* card_value = _card_table->byte_for(*p);
+  void update_card_value(oop obj) {
+    if (ShenandoahHeap::heap()->is_in_young(obj)) {
+      volatile CardTable::CardValue* card_value = _card_table->byte_for(obj);
       *card_value = CardTable::dirty_card_val();
     }
   }
 
-  void do_oop(narrowOop* p) {
-    ShouldNotReachHere();
-  }
-};
-
-class UpdateObjectCardValuesClosure : public BasicOopIterateClosure {
-  UpdateOopCardValueClosure* _oop_closure;
-
 public:
-  UpdateObjectCardValuesClosure(UpdateOopCardValueClosure *oop_closure) :
-    _oop_closure(oop_closure) {
-  }
+  UpdateCardValueClosure(CardTable *card_table) : _card_table(card_table) { }
 
   void do_oop(oop* p) {
-    (*p)->oop_iterate(_oop_closure);
+    update_card_value(*p);
   }
 
   void do_oop(narrowOop* p) {
-    ShouldNotReachHere();
+    narrowOop o = RawAccess<>::oop_load(p);
+    if (!CompressedOops::is_null(o)) {
+      oop obj = CompressedOops::decode_not_null(o);
+      assert(oopDesc::is_oop(obj), "must be a valid oop");
+      update_card_value(obj);
+    }
   }
 };
 
@@ -746,9 +739,8 @@ void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affil
         assert(SafepointSynchronize::is_at_safepoint(), "must be at a safepoint");
         card_table->clear_MemRegion(MemRegion(_bottom, _end));
 
-        UpdateOopCardValueClosure oop_closure(card_table);
-        UpdateObjectCardValuesClosure object_closure(&oop_closure);
-        oop_iterate(&object_closure);
+        UpdateCardValueClosure update_card_value(card_table);
+        oop_iterate(&update_card_value);
       }
       break;
     default:
