@@ -372,9 +372,14 @@ inline oop ShenandoahHeap::try_evacuate_object(oop p, Thread* thread, Shenandoah
   }
 }
 
+inline bool ShenandoahHeap::is_old(oop obj) const {
+  return is_gc_generation_young() && is_in_old(obj);
+}
+
 inline bool ShenandoahHeap::requires_marking(const void* entry) const {
   oop obj = oop(entry);
-  return !_marking_context->is_marked(obj);
+  ShenandoahHeap* heap = ShenandoahHeap::heap();
+  return !_marking_context->is_marked_or_old(obj);
 }
 
 inline bool ShenandoahHeap::in_collection_set(oop p) const {

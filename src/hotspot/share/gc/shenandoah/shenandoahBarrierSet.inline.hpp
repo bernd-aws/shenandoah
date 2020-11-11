@@ -85,7 +85,7 @@ inline oop ShenandoahBarrierSet::load_reference_barrier_native(oop obj, T* load_
   }
 
   ShenandoahMarkingContext* const marking_context = _heap->marking_context();
-  if (_heap->is_concurrent_weak_root_in_progress() && !marking_context->is_marked(obj)) {
+  if (_heap->is_concurrent_weak_root_in_progress() && !marking_context->is_marked_or_old(obj)) {
     Thread* thr = Thread::current();
     if (thr->is_Java_thread()) {
       return NULL;
@@ -352,7 +352,7 @@ void ShenandoahBarrierSet::arraycopy_work(T* src, size_t count) {
         oop witness = ShenandoahHeap::cas_oop(fwd, elem_ptr, o);
         obj = fwd;
       }
-      if (ENQUEUE && !ctx->is_marked(obj)) {
+      if (ENQUEUE && !ctx->is_marked_or_old(obj)) {
         queue.enqueue_known_active(obj);
       }
     }

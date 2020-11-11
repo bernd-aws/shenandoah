@@ -44,5 +44,6 @@ bool ShenandoahConcurrentRoots::should_do_concurrent_class_unloading() {
   ShenandoahHeap* const heap = ShenandoahHeap::heap();
   return can_do_concurrent_class_unloading() &&
          heap->unload_classes() &&
-         !heap->is_stw_gc_in_progress();
+         !heap->is_stw_gc_in_progress() &&
+         !heap->is_gc_generation_young();
 }

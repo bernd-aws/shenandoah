@@ -40,6 +40,10 @@ inline bool ShenandoahMarkingContext::is_marked(oop obj) const {
   return allocated_after_mark_start(obj) || _mark_bit_map.is_marked(obj);
 }
 
+inline bool ShenandoahMarkingContext::is_marked_or_old(oop obj) const {
+  return is_marked(obj) || ShenandoahHeap::heap()->is_old(obj);
+}
+
 inline bool ShenandoahMarkingContext::allocated_after_mark_start(oop obj) const {
   HeapWord* addr = cast_from_oop<HeapWord*>(obj);
   return allocated_after_mark_start(addr);

@@ -740,6 +740,10 @@ bool ShenandoahHeap::is_in_young(const void* p) const {
   return heap_region_containing(p)->affiliation() == ShenandoahRegionAffiliation::YOUNG_GENERATION;
 }
 
+bool ShenandoahHeap::is_in_old(const void* p) const {
+  return heap_region_containing(p)->affiliation() == ShenandoahRegionAffiliation::OLD_GENERATION;
+}
+
 void ShenandoahHeap::op_uncommit(double shrink_before, size_t shrink_until) {
   assert (ShenandoahUncommit, "should be enabled");
 
@@ -1686,8 +1690,10 @@ void ShenandoahEvacUpdateCleanupOopStorageRootsClosure::do_oop(oop* p) {
   const oop obj = RawAccess<>::oop_load(p);
   if (!CompressedOops::is_null(obj)) {
     if (!_mark_context->is_marked(obj)) {
-      shenandoah_assert_correct(p, obj);
-      Atomic::cmpxchg(p, obj, oop(NULL));
+      if (!_heap->is_old(obj)) {
+        shenandoah_assert_correct(p, obj);
+        Atomic::cmpxchg(p, obj, oop(NULL));
+      }
     } else if (_evac_in_progress && _heap->in_collection_set(obj)) {
       oop resolved = ShenandoahBarrierSet::resolve_forwarded_not_null(obj);
       if (resolved == obj) {

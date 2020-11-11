@@ -414,6 +414,7 @@ void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk) {
   // Could call objects iterate, but this is easier.
   while (obj_addr < t) {
     oop obj = oop(obj_addr);
+    assert(obj->klass() != NULL, "klass must not be NULL");
     obj_addr += obj->oop_iterate_size(blk);
   }
 }

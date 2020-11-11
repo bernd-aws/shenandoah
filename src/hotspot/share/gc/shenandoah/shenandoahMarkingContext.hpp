@@ -54,6 +54,7 @@ public:
   inline bool mark(oop obj);
 
   inline bool is_marked(oop obj) const;
+  inline bool is_marked_or_old(oop obj) const;
 
   inline bool allocated_after_mark_start(oop obj) const;
   inline bool allocated_after_mark_start(HeapWord* addr) const;
