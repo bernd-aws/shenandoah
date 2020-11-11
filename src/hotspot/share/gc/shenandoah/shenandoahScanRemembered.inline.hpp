@@ -173,6 +173,7 @@ ShenandoahCardCluster<RememberedSet>::get_first_start(uint32_t card_index) {
   HeapWord *addr = _rs->addr_for_card_index(card_index);
   ShenandoahHeap *heap = ShenandoahHeap::heap();
   ShenandoahHeapRegion *region = heap->heap_region_containing(addr);
+
   HeapWord *obj = region->block_start(addr);
 
   assert(obj != NULL, "Object cannot be null.");
@@ -198,8 +199,15 @@ ShenandoahCardCluster<RememberedSet>::get_last_start(uint32_t card_index) {
   ShenandoahHeap *heap = ShenandoahHeap::heap();
   ShenandoahHeapRegion *region = heap->heap_region_containing(addr);
   HeapWord *obj = region->block_start(addr);
-  
   assert(obj != NULL, "Object cannot be null.");
+
+  if (region->top() <= end_addr) {
+#ifdef DEBUG_TRACE
+    printf(" truncating end_addr in get_last_start by %u HeapWords\n", (unsigned int) (end_addr - region->top()));
+    fflush(stdout);
+#endif
+    end_addr = region->top();
+  }
 
   HeapWord *end_obj = obj + oop(obj)->size();
   while (end_obj < end_addr) {
@@ -217,7 +225,6 @@ ShenandoahCardCluster<RememberedSet>::get_crossing_object_start(uint32_t card_in
   uint32_t cluster_no = card_index / ShenandoahCardCluster<RememberedSet>::CardsPerCluster;
   HeapWord *cluster_addr = _rs->addr_for_card_index(cluster_no * CardsPerCluster);
 
-  HeapWord *end_addr = addr + CardTable::card_size_in_words;
   ShenandoahHeap *heap = ShenandoahHeap::heap();
   ShenandoahHeapRegion *region = heap->heap_region_containing(addr);
   HeapWord *obj = region->block_start(addr);
@@ -506,7 +513,11 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint worker_id, Refere
 #endif
         }
         // Increment card_index to account for the spanning object, even if we didn't scan it.
-        card_index = last_card;
+        card_index = (last_card > card_index)? last_card: card_index + 1;
+#ifdef DEBUG_TRACE
+        printf("%u: card_index incremented to %d\n", worker_id, card_index);
+        fflush(stdout);
+#endif
       } else {
 #ifdef DEBUG_TRACE
         printf("%u: card is not dirty, and card does not have object\n", worker_id);
