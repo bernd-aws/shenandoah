@@ -703,7 +703,10 @@ public:
   UpdateCardValueClosure(CardTable *card_table) : _card_table(card_table) { }
 
   void do_oop(oop* p) {
-    update_card_value(*p);
+    oop obj = *p;
+    if (obj != NULL) {
+      update_card_value(obj);
+    }
   }
 
   void do_oop(narrowOop* p) {
