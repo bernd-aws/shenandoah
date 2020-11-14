@@ -401,6 +401,8 @@ public:
   void increment_age() { if (_age < markWord::max_age) { _age++; } }
   void reset_age()     { _age = 0; }
 
+  void promote();
+
 private:
   void do_commit();
   void do_uncommit();

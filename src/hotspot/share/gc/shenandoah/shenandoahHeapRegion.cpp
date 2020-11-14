@@ -688,37 +688,6 @@ size_t ShenandoahHeapRegion::pin_count() const {
   return Atomic::load(&_critical_pins);
 }
 
-class UpdateCardValueClosure : public BasicOopIterateClosure {
-private:
-  CardTable* _card_table;
-
-  void update_card_value(oop obj) {
-    if (ShenandoahHeap::heap()->is_in_young(obj)) {
-      volatile CardTable::CardValue* card_value = _card_table->byte_for(obj);
-      *card_value = CardTable::dirty_card_val();
-    }
-  }
-
-public:
-  UpdateCardValueClosure(CardTable *card_table) : _card_table(card_table) { }
-
-  void do_oop(oop* p) {
-    oop obj = *p;
-    if (obj != NULL) {
-      update_card_value(obj);
-    }
-  }
-
-  void do_oop(narrowOop* p) {
-    narrowOop o = RawAccess<>::oop_load(p);
-    if (!CompressedOops::is_null(o)) {
-      oop obj = CompressedOops::decode_not_null(o);
-      assert(oopDesc::is_oop(obj), "must be a valid oop");
-      update_card_value(obj);
-    }
-  }
-};
-
 void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affiliation) {
   ShenandoahHeap* heap = ShenandoahHeap::heap();
   if (!heap->mode()->is_generational() || _affiliation == new_affiliation) {
@@ -739,17 +708,79 @@ void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affil
       heap->young_generation()->increment_affiliated_region_count();
       break;
     case OLD_GENERATION:
-      if (_affiliation == YOUNG_GENERATION) {
-        assert(SafepointSynchronize::is_at_safepoint(), "must be at a safepoint");
-        card_table->clear_MemRegion(MemRegion(_bottom, _end));
-
-        UpdateCardValueClosure update_card_value(card_table);
-        oop_iterate(&update_card_value);
-      }
       break;
     default:
       ShouldNotReachHere();
       return;
   }
   _affiliation = new_affiliation;
+}
+
+class UpdateCardValuesClosure : public BasicOopIterateClosure {
+private:
+  void update_card_value(oop obj) {
+    if (ShenandoahHeap::heap()->is_in_young(obj)) {
+      volatile CardTable::CardValue* card_value = ShenandoahBarrierSet::barrier_set()->card_table()->byte_for(obj);
+      *card_value = CardTable::dirty_card_val();
+    }
+  }
+
+public:
+  void do_oop(oop* p) {
+    oop obj = *p;
+    if (obj != NULL) {
+      update_card_value(obj);
+    }
+  }
+
+  void do_oop(narrowOop* p) {
+    narrowOop o = RawAccess<>::oop_load(p);
+    if (!CompressedOops::is_null(o)) {
+      oop obj = CompressedOops::decode_not_null(o);
+      assert(oopDesc::is_oop(obj), "must be a valid oop");
+      update_card_value(obj);
+    }
+  }
+};
+
+void ShenandoahHeapRegion::promote() {
+  assert(SafepointSynchronize::is_at_safepoint(), "must be at a safepoint");
+
+  ShenandoahHeap* heap = ShenandoahHeap::heap();
+  ShenandoahMarkingContext* marking_context = heap->complete_marking_context();
+  assert(marking_context->is_complete(), "sanity");
+
+  UpdateCardValuesClosure update_card_values;
+
+  if (is_humongous_start()) {
+    oop obj = oop(bottom());
+    assert(marking_context->is_marked(obj), "promoted humongous object should be alive");
+
+    int index_limit = index() + ShenandoahHeapRegion::required_regions(obj->size() * HeapWordSize);
+    for (int i = index(); i < index_limit; i++) {
+      ShenandoahHeapRegion* r = heap->get_region(i);
+      printf("promoting region %lu, from %lx to %lx\n", r->index(), (size_t) r->bottom(), (size_t) r->top());
+      ShenandoahBarrierSet::barrier_set()->card_table()->clear_MemRegion(MemRegion(r->bottom(), r->end()));
+      r->set_affiliation(OLD_GENERATION);
+    }
+    obj->oop_iterate(&update_card_values);
+  } else {
+    printf("promoting region %lu, from %lx to %lx\n", index(), (size_t) bottom(), (size_t) top());
+    assert(!is_humongous_continuation(), "should not promote humongous object continuation in isolation");
+    ShenandoahBarrierSet::barrier_set()->card_table()->clear_MemRegion(MemRegion(bottom(), end()));
+    set_affiliation(OLD_GENERATION);
+
+    HeapWord* obj_addr = bottom();
+    while (obj_addr < top()) {
+      oop obj = oop(obj_addr);
+      if (marking_context->is_marked(obj)) {
+        assert(obj->klass() != NULL, "klass should not be NULL");
+        obj_addr += obj->oop_iterate_size(&update_card_values);
+      } else {
+        ShenandoahHeap::fill_with_object(obj_addr, obj->size());
+        obj_addr += obj->size();
+      }
+    }
+  }
+  fflush(stdout);
 }

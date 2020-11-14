@@ -26,6 +26,7 @@
 #define SHARE_VM_GC_SHENANDOAH_SHENANDOAHYOUNGGENERATION_HPP
 
 #include "gc/shenandoah/shenandoahGeneration.hpp"
+#include "gc/shenandoah/shenandoahHeapRegion.hpp"
 
 class ShenandoahYoungGeneration : public ShenandoahGeneration {
 private:

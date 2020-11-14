@@ -44,3 +44,7 @@ bool ShenandoahCardTable::is_dirty(MemRegion mr) {
   }
   return false;
 }
+
+void ShenandoahCardTable::clear() {
+  CardTable::clear(_whole_heap);
+}

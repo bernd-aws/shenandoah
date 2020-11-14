@@ -229,6 +229,7 @@ void ShenandoahYoungGeneration::op_final_mark() {
 class ShenandoahPromoteTenuredRegionsTask : public AbstractGangTask {
 private:
   ShenandoahRegionIterator* _regions;
+  ShenandoahMarkingContext* _marking_context;
 public:
   ShenandoahPromoteTenuredRegionsTask(ShenandoahRegionIterator* regions) :
     AbstractGangTask("Shenandoah Promote Tenured Regions"),
@@ -239,8 +240,8 @@ public:
     ShenandoahParallelWorkerSession worker_session(worker_id);
     ShenandoahHeapRegion* r = _regions->next();
     while (r != NULL) {
-      if (r->affiliation() == YOUNG_GENERATION && r->age() >= InitialTenuringThreshold) {
-        r->set_affiliation(OLD_GENERATION);
+      if (r->is_young() && r->age() >= InitialTenuringThreshold && !r->is_humongous_continuation()) {
+        r->promote();
       }
       r = _regions->next();
     }
@@ -254,17 +255,16 @@ void ShenandoahYoungGeneration::promote_tenured_regions() {
 }
 
 void ShenandoahYoungGeneration::promote_all_regions() {
-  _used = 0;
-
   ShenandoahHeap* heap = ShenandoahHeap::heap();
   for (size_t index = 0; index < heap->num_regions(); index++) {
-    ShenandoahHeapRegion* region = heap->get_region(index);
-    if (region->is_young()) {
-      region->set_affiliation(ShenandoahRegionAffiliation::OLD_GENERATION);
+    ShenandoahHeapRegion* r = heap->get_region(index);
+    if (r->is_young()) {
+      r->set_affiliation(ShenandoahRegionAffiliation::OLD_GENERATION);
     }
   }
-
   assert(_affiliated_region_count == 0, "young generation must not have affiliated regions after reset");
+  _used = 0;
+  ShenandoahBarrierSet::barrier_set()->card_table()->clear();
 }
 
 void ShenandoahYoungGeneration::log_status() const {
