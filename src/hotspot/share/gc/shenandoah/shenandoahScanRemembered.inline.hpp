@@ -26,7 +26,7 @@
 #ifndef SHARE_GC_SHENANDOAH_SHENANDOAHSCANREMEMBEREDINLINE_HPP
 #define SHARE_GC_SHENANDOAH_SHENANDOAHSCANREMEMBEREDINLINE_HPP
 
-#undef DEBUG_TRACE
+#define DEBUG_TRACE
 
 #include "memory/iterator.hpp"
 #include "oops/oop.hpp"
@@ -434,6 +434,14 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint worker_id, Refere
             } else {
 #ifdef DEBUG_TRACE
               printf("%u: it is not an object array, so we'll do_oop() on its reference\n", worker_id);
+              // kelvin added the following lines just because he wants to see how typical objects are represented.  right now, I'm especially interested
+              // in understanding representation of Object and representation of integer array.
+              uint32_t *up = (uint32_t *) p;
+              printf("first few words are: 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n",
+                     up[0], up[1], up[2], up[3], up[4], up[5], up[6], up[7], up[8], up[9], up[10], up[11]);
+              uint64_t *ullp = (uint64_t *) p;
+              printf("    as double words: 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx 0x%lx\n",
+                     ullp[0], ullp[1], ullp[2], ullp[3], ullp[4], ullp[5], ullp[6], ullp[7], ullp[8], ullp[9], ullp[10], ullp[11]);
               fflush(stdout);
 #endif
               oops->do_oop(&obj);

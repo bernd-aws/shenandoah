@@ -22,6 +22,8 @@
  *
  */
 
+#define TRACE_PROMOTION
+
 #ifndef SHARE_GC_SHENANDOAH_SHENANDOAHHEAP_INLINE_HPP
 #define SHARE_GC_SHENANDOAH_SHENANDOAHHEAP_INLINE_HPP
 
@@ -348,6 +350,13 @@ inline oop ShenandoahHeap::try_evacuate_object(oop p, Thread* thread, Shenandoah
   if (result == copy_val) {
     // Successfully evacuated. Our copy is now the public one!
     shenandoah_assert_correct(NULL, copy_val);
+#ifdef TRACE_PROMOTION
+    if (target_gen == OLD_GENERATION) {
+      printf("young-gen object %llx promoted to old-gen %llx\n",
+             (unsigned long long) cast_from_oop<HeapWord *>(p), (unsigned long long) copy);
+    }
+#endif
+
     return copy_val;
   }  else {
     // Failed to evacuate. We need to deal with the object that is left behind. Since this

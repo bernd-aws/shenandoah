@@ -2459,8 +2459,8 @@ private:
               r->oop_iterate(&cl);
             }
           } else {
-            // Note that we use this code even if we are doing an old-gen collection and the old-gen collection
-            // and we have a bitmap to represent marked objects within the heap region.
+            // Note that we use this code even if we are doing an old-gen collection and we have a bitmap to
+            // represent marked objects within the heap region.
             //
             // It is necessary to process all objects, rather than just the marked objects, during update-refs of
             // an old-gen region as part of an old-gen collection.  Otherwise, a subseqent update-refs scan of
