@@ -204,9 +204,6 @@ HeapWord* ShenandoahFreeSet::try_allocate_in(ShenandoahHeapRegion* r, Shenandoah
       size_t waste = r->free();
       if (waste > 0) {
         increase_used(waste);
-        if (r->affiliation() == ShenandoahRegionAffiliation::YOUNG_GENERATION) {
-          _heap->young_generation()->increase_used(waste);
-        }
         _heap->notify_mutator_alloc_words(waste >> LogHeapWordSize, true);
       }
     }
