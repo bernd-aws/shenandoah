@@ -2604,8 +2604,6 @@ void ShenandoahHeap::op_final_updaterefs() {
 
   if (is_degenerated_gc_in_progress()) {
     global_generation()->concurrent_mark()->update_roots(ShenandoahPhaseTimings::degen_gc_update_roots);
-  } else {
-    global_generation()->concurrent_mark()->update_thread_roots(ShenandoahPhaseTimings::final_update_refs_roots);
   }
 
   // Has to be done before cset is clear
