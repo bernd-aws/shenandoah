@@ -1023,7 +1023,9 @@ void ShenandoahMarkCompact::phase4_compact_objects(ShenandoahHeapRegionSet** wor
     heap->collection_set()->clear();
     heap->free_set()->rebuild();
 
-    heap->young_generation()->promote_all_regions();
+    if (heap->mode()->is_generational()) {
+      heap->young_generation()->promote_all_regions();
+    }
   }
 
   heap->clear_cancelled_gc();
