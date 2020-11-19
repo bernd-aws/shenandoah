@@ -48,6 +48,33 @@ void ShenandoahGeneration::initialize_heuristics(ShenandoahMode* gc_mode) {
   }
 }
 
+size_t ShenandoahGeneration::bytes_allocated_since_gc_start() {
+  return ShenandoahHeap::heap()->bytes_allocated_since_gc_start();
+}
+
+void ShenandoahGeneration::log_status() const {
+  LogTarget(Info, gc, ergo) log_target;
+
+  if (!log_target.is_enabled()) {
+    return;
+  }
+
+  // Not under a lock here, so read each of these once to make sure
+  // byte size in proper unit and proper unit for byte size are consistent.
+  size_t v_used = used();
+  size_t v_used_regions = used_regions_size();
+  size_t v_soft_max_capacity = soft_max_capacity();
+  size_t v_max_capacity = max_capacity();
+  size_t v_available = available();
+  log_target.print("Young Generation Used: " SIZE_FORMAT "%s, Used Regions: " SIZE_FORMAT "%s, "
+                   "Soft Capacity: " SIZE_FORMAT "%s, Max Capacity: " SIZE_FORMAT " %s, Available: " SIZE_FORMAT " %s",
+                   byte_size_in_proper_unit(v_used),              proper_unit_for_byte_size(v_used),
+                   byte_size_in_proper_unit(v_used_regions),      proper_unit_for_byte_size(v_used_regions),
+                   byte_size_in_proper_unit(v_soft_max_capacity), proper_unit_for_byte_size(v_soft_max_capacity),
+                   byte_size_in_proper_unit(v_max_capacity),      proper_unit_for_byte_size(v_max_capacity),
+                   byte_size_in_proper_unit(v_available),         proper_unit_for_byte_size(v_available));
+}
+
 void ShenandoahGeneration::entry_init_mark() {
   ShenandoahHeap* heap = ShenandoahHeap::heap();
 
@@ -169,8 +196,3 @@ void ShenandoahGeneration::op_init_mark() {
 void ShenandoahGeneration::op_mark() {
   concurrent_mark()->mark_from_roots();
 }
-
-size_t ShenandoahGeneration::bytes_allocated_since_gc_start() {
-  return ShenandoahHeap::heap()->bytes_allocated_since_gc_start();
-}
-

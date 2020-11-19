@@ -59,6 +59,8 @@ public:
 
   virtual size_t bytes_allocated_since_gc_start();
 
+  void log_status() const;
+
   // Entry methods to normally STW GC operations. These set up logging, monitoring
   // and workers for net VM operation
   void entry_init_mark();

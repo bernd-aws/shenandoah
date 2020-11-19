@@ -46,9 +46,6 @@ private:
   size_t configured_capacity(size_t capacity) const;
 
 public:
-
-  void log_status() const;
-
   virtual size_t max_capacity() const;
   virtual size_t soft_max_capacity() const;
   virtual size_t used_regions_size() const;

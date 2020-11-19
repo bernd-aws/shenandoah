@@ -224,6 +224,7 @@ void ShenandoahControlThread::run_service() {
             heap->young_generation()->log_status();
             service_concurrent_young_cycle(cause);
           } else {
+            heap->global_generation()->log_status();
             service_concurrent_global_cycle(cause);
           }
           break;
