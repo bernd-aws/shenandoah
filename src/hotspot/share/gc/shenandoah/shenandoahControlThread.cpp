@@ -83,6 +83,7 @@ void ShenandoahControlThread::run_service() {
   ShenandoahHeap* heap = ShenandoahHeap::heap();
 
   GCMode default_mode = concurrent_normal;
+  GenerationMode generation = GLOBAL;
   GCCause::Cause default_cause = GCCause::_shenandoah_concurrent_gc;
   int sleep = ShenandoahControlIntervalMin;
 
@@ -96,7 +97,8 @@ void ShenandoahControlThread::run_service() {
   double shrink_period = (double)ShenandoahUncommitDelay / 1000 / 10;
 
   ShenandoahCollectorPolicy* policy = heap->shenandoah_policy();
-  ShenandoahHeuristics* heuristics = heap->heuristics();
+  ShenandoahHeuristics* global_heuristics = heap->global_generation()->heuristics();
+  ShenandoahHeuristics* young_heuristics = heap->young_generation()->heuristics();
   while (!in_graceful_shutdown() && !should_terminate()) {
     // Figure out if we have pending requests.
     bool alloc_failure_pending = _alloc_failure_gc.is_set();
@@ -118,70 +120,79 @@ void ShenandoahControlThread::run_service() {
       // Allocation failure takes precedence: we have to deal with it first thing
       log_info(gc)("Trigger: Handle Allocation Failure");
 
+      generation = GLOBAL;
       cause = GCCause::_allocation_failure;
 
       // Consume the degen point, and seed it with default value
       degen_point = _degen_point;
       _degen_point = ShenandoahHeap::_degenerated_outside_cycle;
 
-      if (ShenandoahDegeneratedGC && heuristics->should_degenerate_cycle()) {
-        heuristics->record_allocation_failure_gc();
+      if (ShenandoahDegeneratedGC && global_heuristics->should_degenerate_cycle()) {
+        global_heuristics->record_allocation_failure_gc();
         policy->record_alloc_failure_to_degenerated(degen_point);
         mode = stw_degenerated;
       } else {
-        heuristics->record_allocation_failure_gc();
+        global_heuristics->record_allocation_failure_gc();
         policy->record_alloc_failure_to_full();
         mode = stw_full;
       }
 
     } else if (explicit_gc_requested) {
+      generation = GLOBAL;
       cause = _requested_gc_cause;
       log_info(gc)("Trigger: Explicit GC request (%s)", GCCause::to_string(cause));
 
-      heuristics->record_requested_gc();
+      global_heuristics->record_requested_gc();
 
       if (ExplicitGCInvokesConcurrent) {
         policy->record_explicit_to_concurrent();
         mode = default_mode;
         // Unload and clean up everything
-        heap->set_process_references(heuristics->can_process_references());
-        heap->set_unload_classes(heuristics->can_unload_classes());
+        heap->set_process_references(global_heuristics->can_process_references());
+        heap->set_unload_classes(global_heuristics->can_unload_classes());
       } else {
         policy->record_explicit_to_full();
         mode = stw_full;
       }
     } else if (implicit_gc_requested) {
+      generation = GLOBAL;
       cause = _requested_gc_cause;
       log_info(gc)("Trigger: Implicit GC request (%s)", GCCause::to_string(cause));
 
-      heuristics->record_requested_gc();
+      global_heuristics->record_requested_gc();
 
       if (ShenandoahImplicitGCInvokesConcurrent) {
         policy->record_implicit_to_concurrent();
         mode = default_mode;
 
         // Unload and clean up everything
-        heap->set_process_references(heuristics->can_process_references());
-        heap->set_unload_classes(heuristics->can_unload_classes());
+        heap->set_process_references(global_heuristics->can_process_references());
+        heap->set_unload_classes(global_heuristics->can_unload_classes());
       } else {
         policy->record_implicit_to_full();
         mode = stw_full;
       }
     } else {
       // Potential normal cycle: ask heuristics if it wants to act
-      if (heuristics->should_start_gc()) {
-        mode = default_mode;
+      if (global_heuristics->should_start_gc()) {
+        generation = GLOBAL;
         cause = default_cause;
+        mode = default_mode;
+        // Ask policy if this cycle wants to process references or unload classes
+        heap->set_process_references(global_heuristics->should_process_references());
+        heap->set_unload_classes(global_heuristics->should_unload_classes());
+      } else if (heap->mode()->is_generational() && young_heuristics->should_start_gc()) {
+        generation = YOUNG;
+        cause = default_cause;
+        mode = default_mode;
+        heap->set_process_references(false);
+        heap->set_unload_classes(false);
       }
-
-      // Ask policy if this cycle wants to process references or unload classes
-      heap->set_process_references(heuristics->should_process_references());
-      heap->set_unload_classes(heuristics->should_unload_classes());
     }
 
     // Blow all soft references on this cycle, if handling allocation failure,
-    // either implicit or explicit GC request,  or we are requested to do so unconditionally.
-    if (alloc_failure_pending || implicit_gc_requested || explicit_gc_requested || ShenandoahAlwaysClearSoftRefs) {
+    // either implicit or explicit GC request, or we are requested to do so unconditionally.
+    if (generation != YOUNG && (alloc_failure_pending || implicit_gc_requested || explicit_gc_requested || ShenandoahAlwaysClearSoftRefs)) {
       heap->soft_ref_policy()->set_should_clear_all_soft_refs(true);
     }
 
@@ -209,10 +220,8 @@ void ShenandoahControlThread::run_service() {
 
       switch (mode) {
         case concurrent_normal:
-          if (heap->mode()->is_generational()) {
+          if (generation == YOUNG) {
             heap->young_generation()->log_status();
-            // TODO: Only young collections for now.
-            // We'll add old collections later.
             service_concurrent_young_cycle(cause);
           } else {
             service_concurrent_global_cycle(cause);
@@ -269,7 +278,8 @@ void ShenandoahControlThread::run_service() {
 
       // Clear metaspace oom flag, if current cycle unloaded classes
       if (heap->unload_classes()) {
-        heuristics->clear_metaspace_oom();
+        assert(generation != YOUNG, "should not unload classes in young cycle");
+        global_heuristics->clear_metaspace_oom();
       }
 
       // Commit worker statistics to cycle data
@@ -479,7 +489,7 @@ void ShenandoahControlThread::service_concurrent_global_cycle(GCCause::Cause cau
   }
 
   // Cycle is complete
-  heap->heuristics()->record_success_concurrent();
+  generation->heuristics()->record_success_concurrent();
   heap->shenandoah_policy()->record_success_concurrent();
 }
 
@@ -568,7 +578,7 @@ void ShenandoahControlThread::service_concurrent_young_cycle(GCCause::Cause caus
   }
 
   // Cycle is complete
-  heap->heuristics()->record_success_concurrent();
+  generation->heuristics()->record_success_concurrent();
   heap->shenandoah_policy()->record_success_concurrent();
 }
 
@@ -593,11 +603,12 @@ void ShenandoahControlThread::stop_service() {
 void ShenandoahControlThread::service_stw_full_cycle(GCCause::Cause cause) {
   GCIdMark gc_id_mark;
   ShenandoahHeap* heap = ShenandoahHeap::heap();
-  ShenandoahGCSession session(cause, heap->global_generation());
+  ShenandoahGeneration* generation = heap->global_generation();
+  ShenandoahGCSession session(cause, generation);
 
   heap->vmop_entry_full(cause);
 
-  heap->heuristics()->record_success_full();
+  generation->heuristics()->record_success_full();
   heap->shenandoah_policy()->record_success_full();
 }
 
@@ -606,11 +617,12 @@ void ShenandoahControlThread::service_stw_degenerated_cycle(GCCause::Cause cause
 
   GCIdMark gc_id_mark;
   ShenandoahHeap* heap = ShenandoahHeap::heap();
-  ShenandoahGCSession session(cause, heap->global_generation());
+  ShenandoahGeneration* generation = heap->global_generation();
+  ShenandoahGCSession session(cause, generation);
 
   heap->vmop_degenerated(point);
 
-  heap->heuristics()->record_success_degenerated();
+  generation->heuristics()->record_success_degenerated();
   heap->shenandoah_policy()->record_success_degenerated();
 }
 

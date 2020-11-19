@@ -97,7 +97,7 @@ void ShenandoahGlobalGeneration::op_final_mark() {
       ShenandoahGCPhase phase(ShenandoahPhaseTimings::choose_cset);
       ShenandoahHeapLocker locker(heap->lock());
       heap->collection_set()->clear();
-      heap->heuristics()->choose_collection_set(heap->collection_set());
+      heuristics()->choose_collection_set(heap->collection_set());
     }
 
     {

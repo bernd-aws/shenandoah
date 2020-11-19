@@ -46,7 +46,11 @@ public:
 
   inline ShenandoahConcurrentMark* concurrent_mark() const { return _scm; }
 
+  inline ShenandoahHeuristics* heuristics() const { return _heuristics; }
+
 public:
+  void initialize_heuristics(ShenandoahMode* gc_mode);
+
   virtual size_t soft_max_capacity() const = 0;
   virtual size_t max_capacity() const = 0;
   virtual size_t used_regions_size() const = 0;

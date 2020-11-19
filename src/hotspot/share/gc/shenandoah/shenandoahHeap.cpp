@@ -465,18 +465,8 @@ void ShenandoahHeap::initialize_heuristics() {
                     _gc_mode->name()));
   }
 
-  _heuristics = _gc_mode->initialize_heuristics(global_generation());
-
-  if (_heuristics->is_diagnostic() && !UnlockDiagnosticVMOptions) {
-    vm_exit_during_initialization(
-            err_msg("Heuristics \"%s\" is diagnostic, and must be enabled via -XX:+UnlockDiagnosticVMOptions.",
-                    _heuristics->name()));
-  }
-  if (_heuristics->is_experimental() && !UnlockExperimentalVMOptions) {
-    vm_exit_during_initialization(
-            err_msg("Heuristics \"%s\" is experimental, and must be enabled via -XX:+UnlockExperimentalVMOptions.",
-                    _heuristics->name()));
-  }
+  _global_generation->initialize_heuristics(_gc_mode);
+  _young_generation->initialize_heuristics(_gc_mode);
 }
 
 #ifdef _MSC_VER
@@ -502,7 +492,6 @@ ShenandoahHeap::ShenandoahHeap(ShenandoahCollectorPolicy* policy) :
   _global_generation(new ShenandoahGlobalGeneration()),
   _control_thread(NULL),
   _shenandoah_policy(policy),
-  _heuristics(NULL),
   _free_set(NULL),
   _full_gc(new ShenandoahMarkCompact()),
   _pacer(NULL),
@@ -639,8 +628,6 @@ void ShenandoahHeap::post_initialize() {
   _full_gc->initialize(_gc_timer);
 
   ref_processing_init();
-
-  _heuristics->initialize();
 
   JFR_ONLY(ShenandoahJFRSupport::register_jfr_type_serializers());
 }
@@ -941,8 +928,8 @@ MetaWord* ShenandoahHeap::satisfy_failed_metadata_allocation(ClassLoaderData* lo
   MetaWord* result;
 
   // Inform metaspace OOM to GC heuristics if class unloading is possible.
-  if (heuristics()->can_unload_classes()) {
-    ShenandoahHeuristics* h = heuristics();
+  ShenandoahHeuristics* h = global_generation()->heuristics();
+  if (h->can_unload_classes()) {
     h->record_metaspace_oom();
   }
 
@@ -1916,8 +1903,8 @@ void ShenandoahHeap::op_degenerated(ShenandoahDegenPoint point) {
       //
       // Note that we can only do this for "outside-cycle" degens, otherwise we would risk
       // changing the cycle parameters mid-cycle during concurrent -> degenerated handover.
-      set_process_references(heuristics()->can_process_references());
-      set_unload_classes(heuristics()->can_unload_classes());
+      set_process_references(global_generation()->heuristics()->can_process_references());
+      set_unload_classes(global_generation()->heuristics()->can_unload_classes());
 
       op_reset();
 

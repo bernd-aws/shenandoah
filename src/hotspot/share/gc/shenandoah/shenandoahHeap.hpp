@@ -449,7 +449,6 @@ private:
   ShenandoahControlThread*   _control_thread;
   ShenandoahCollectorPolicy* _shenandoah_policy;
   ShenandoahMode*            _gc_mode;
-  ShenandoahHeuristics*      _heuristics;
   ShenandoahFreeSet*         _free_set;
   ShenandoahMarkCompact*     _full_gc;
   ShenandoahPacer*           _pacer;
@@ -465,7 +464,6 @@ public:
   ShenandoahGeneration*      global_generation() const { return _global_generation; }
   ShenandoahCollectorPolicy* shenandoah_policy() const { return _shenandoah_policy; }
   ShenandoahMode*            mode()              const { return _gc_mode;           }
-  ShenandoahHeuristics*      heuristics()        const { return _heuristics;        }
   ShenandoahFreeSet*         free_set()          const { return _free_set;          }
   ShenandoahPacer*           pacer()             const { return _pacer;             }
 

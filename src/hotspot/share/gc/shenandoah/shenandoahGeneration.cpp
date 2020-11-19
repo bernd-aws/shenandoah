@@ -24,13 +24,29 @@
 
 #include "gc/shenandoah/shenandoahConcurrentRoots.hpp"
 #include "gc/shenandoah/shenandoahFreeSet.hpp"
+#include "gc/shenandoah/shenandoahGeneration.hpp"
 #include "gc/shenandoah/shenandoahHeap.hpp"
 #include "gc/shenandoah/shenandoahConcurrentMark.hpp"
 #include "gc/shenandoah/shenandoahMonitoringSupport.hpp"
 #include "gc/shenandoah/shenandoahUtils.hpp"
 #include "gc/shenandoah/shenandoahVerifier.hpp"
 #include "gc/shenandoah/shenandoahWorkerPolicy.hpp"
-#include "gc/shenandoah/shenandoahGeneration.hpp"
+#include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
+
+void ShenandoahGeneration::initialize_heuristics(ShenandoahMode* gc_mode) {
+  _heuristics = gc_mode->initialize_heuristics(this);
+
+  if (_heuristics->is_diagnostic() && !UnlockDiagnosticVMOptions) {
+    vm_exit_during_initialization(
+            err_msg("Heuristics \"%s\" is diagnostic, and must be enabled via -XX:+UnlockDiagnosticVMOptions.",
+                    _heuristics->name()));
+  }
+  if (_heuristics->is_experimental() && !UnlockExperimentalVMOptions) {
+    vm_exit_during_initialization(
+            err_msg("Heuristics \"%s\" is experimental, and must be enabled via -XX:+UnlockExperimentalVMOptions.",
+                    _heuristics->name()));
+  }
+}
 
 void ShenandoahGeneration::entry_init_mark() {
   ShenandoahHeap* heap = ShenandoahHeap::heap();

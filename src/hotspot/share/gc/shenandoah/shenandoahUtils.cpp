@@ -40,6 +40,7 @@ ShenandoahPhaseTimings::Phase ShenandoahTimingsTracker::_current_phase = Shenand
 
 ShenandoahGCSession::ShenandoahGCSession(GCCause::Cause cause, ShenandoahGeneration* generation) :
   _heap(ShenandoahHeap::heap()),
+  _generation(generation),
   _timer(_heap->gc_timer()),
   _tracer(_heap->tracer()) {
   assert(!ShenandoahGCPhase::is_current_phase_valid(), "No current GC phase");
@@ -51,7 +52,7 @@ ShenandoahGCSession::ShenandoahGCSession(GCCause::Cause cause, ShenandoahGenerat
   _heap->trace_heap_before_gc(_tracer);
 
   _heap->shenandoah_policy()->record_cycle_start();
-  _heap->heuristics()->record_cycle_start();
+  generation->heuristics()->record_cycle_start();
   _trace_cycle.initialize(_heap->cycle_memory_manager(), cause,
           /* allMemoryPoolsAffected */    true,
           /* recordGCBeginTime = */       true,
@@ -65,7 +66,7 @@ ShenandoahGCSession::ShenandoahGCSession(GCCause::Cause cause, ShenandoahGenerat
 }
 
 ShenandoahGCSession::~ShenandoahGCSession() {
-  _heap->heuristics()->record_cycle_end();
+  _generation->heuristics()->record_cycle_end();
   _timer->register_gc_end();
   _heap->trace_heap_after_gc(_tracer);
   _tracer->report_gc_end(_timer->gc_end(), _timer->time_partitions());

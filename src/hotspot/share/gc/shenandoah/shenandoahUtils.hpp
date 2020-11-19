@@ -46,6 +46,7 @@ class ShenandoahGeneration;
 class ShenandoahGCSession : public StackObj {
 private:
   ShenandoahHeap* const _heap;
+  ShenandoahGeneration* const _generation;
   GCTimer*  const _timer;
   GCTracer* const _tracer;
 

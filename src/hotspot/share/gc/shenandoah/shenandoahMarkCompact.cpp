@@ -241,8 +241,9 @@ void ShenandoahMarkCompact::phase1_mark_heap() {
   ShenandoahPrepareForMarkClosure cl;
   heap->heap_region_iterate(&cl);
 
-  heap->set_process_references(heap->heuristics()->can_process_references());
-  heap->set_unload_classes(heap->heuristics()->can_unload_classes());
+  ShenandoahGeneration* generation = heap->global_generation();
+  heap->set_process_references(generation->heuristics()->can_process_references());
+  heap->set_unload_classes(generation->heuristics()->can_unload_classes());
 
   ReferenceProcessor* rp = heap->ref_processor();
   // enable ("weak") refs discovery
@@ -250,7 +251,7 @@ void ShenandoahMarkCompact::phase1_mark_heap() {
   rp->setup_policy(true); // forcefully purge all soft references
   rp->set_active_mt_degree(heap->workers()->active_workers());
 
-  ShenandoahConcurrentMark* scm = heap->global_generation()->concurrent_mark();
+  ShenandoahConcurrentMark* scm = generation->concurrent_mark();
   scm->mark_roots(GLOBAL, ShenandoahPhaseTimings::full_gc_scan_roots);
   scm->finish_mark_from_roots(/* full_gc = */ true);
   heap->mark_complete_marking_context();
