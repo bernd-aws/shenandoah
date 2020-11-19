@@ -35,6 +35,7 @@ class ShenandoahGeneration : public CHeapObj<mtGC> {
 private:
   GenerationMode const _generation_mode;
   ShenandoahConcurrentMark* const _scm;
+  ShenandoahHeuristics* _heuristics;
 public:
   ShenandoahGeneration(GenerationMode generation_mode) :
     _generation_mode(generation_mode),

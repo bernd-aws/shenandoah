@@ -465,7 +465,7 @@ void ShenandoahHeap::initialize_heuristics() {
                     _gc_mode->name()));
   }
 
-  _heuristics = _gc_mode->initialize_heuristics();
+  _heuristics = _gc_mode->initialize_heuristics(global_generation());
 
   if (_heuristics->is_diagnostic() && !UnlockDiagnosticVMOptions) {
     vm_exit_during_initialization(
