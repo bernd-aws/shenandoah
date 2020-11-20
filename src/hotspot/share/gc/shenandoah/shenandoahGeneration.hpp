@@ -48,7 +48,8 @@ public:
 
   inline ShenandoahHeuristics* heuristics() const { return _heuristics; }
 
-public:
+  virtual const char* name() const = 0;
+
   void initialize_heuristics(ShenandoahMode* gc_mode);
 
   virtual size_t soft_max_capacity() const = 0;

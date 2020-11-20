@@ -37,6 +37,10 @@ ShenandoahYoungGeneration::ShenandoahYoungGeneration() : ShenandoahGeneration(YO
   _used(0) {
 }
 
+const char* ShenandoahYoungGeneration::name() const {
+  return "young";
+}
+
 void ShenandoahYoungGeneration::increment_affiliated_region_count() {
   _affiliated_region_count++;
 }

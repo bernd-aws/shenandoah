@@ -36,6 +36,8 @@ private:
 public:
   ShenandoahYoungGeneration();
 
+  virtual const char* name() const;
+
   void increment_affiliated_region_count();
   void decrement_affiliated_region_count();
 

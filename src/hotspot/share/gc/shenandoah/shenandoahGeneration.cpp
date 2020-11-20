@@ -66,8 +66,9 @@ void ShenandoahGeneration::log_status() const {
   size_t v_soft_max_capacity = soft_max_capacity();
   size_t v_max_capacity = max_capacity();
   size_t v_available = available();
-  log_target.print("Young Generation Used: " SIZE_FORMAT "%s, Used Regions: " SIZE_FORMAT "%s, "
-                   "Soft Capacity: " SIZE_FORMAT "%s, Max Capacity: " SIZE_FORMAT " %s, Available: " SIZE_FORMAT " %s",
+  log_target.print("%s generation used: " SIZE_FORMAT "%s, used regions: " SIZE_FORMAT "%s, "
+                   "soft capacity: " SIZE_FORMAT "%s, max capacity: " SIZE_FORMAT " %s, available: " SIZE_FORMAT " %s",
+                   name(),
                    byte_size_in_proper_unit(v_used),              proper_unit_for_byte_size(v_used),
                    byte_size_in_proper_unit(v_used_regions),      proper_unit_for_byte_size(v_used_regions),
                    byte_size_in_proper_unit(v_soft_max_capacity), proper_unit_for_byte_size(v_soft_max_capacity),

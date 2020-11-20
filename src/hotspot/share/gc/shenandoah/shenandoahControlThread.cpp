@@ -218,30 +218,49 @@ void ShenandoahControlThread::run_service() {
         heap->free_set()->log_status();
       }
 
-      switch (mode) {
-        case concurrent_normal:
-          if (generation == YOUNG) {
+      {
+        LogTarget(Info, gc, ergo) log;
+        switch (mode) {
+          case concurrent_normal: {
+            if (generation == YOUNG) {
+              if (log.is_enabled()) {
+                log.print("YOUNG GC");
+              }
+              service_concurrent_young_cycle(cause);
+            } else {
+              if (log.is_enabled()) {
+                log.print("GLOBAL GC");
+              }
+              service_concurrent_global_cycle(cause);
+            }
             heap->young_generation()->log_status();
-            service_concurrent_young_cycle(cause);
-          } else {
             heap->global_generation()->log_status();
-            service_concurrent_global_cycle(cause);
+            break;
           }
-          break;
-        case stw_degenerated:
-          if (heap->mode()->is_generational()) {
-            fatal("Degenerated cycles are not yet supported in generational mode.");
+          case stw_degenerated: {
+            if (log.is_enabled()) {
+              log.print("DEGENERATE GC");
+            }
+            if (heap->mode()->is_generational()) {
+              fatal("Degenerated cycles are not yet supported in generational mode.");
+            }
+            service_stw_degenerated_cycle(cause, degen_point);
+            break;
           }
-          service_stw_degenerated_cycle(cause, degen_point);
-          break;
-        case stw_full:
-          if (heap->mode()->is_generational()) {
-            fatal("Full cycles are not yet supported in generational mode.");
+          case stw_full: {
+            if (log.is_enabled()) {
+              log.print("FULL GC");
+            }
+            if (heap->mode()->is_generational()) {
+              fatal("Full cycles are not yet supported in generational mode.");
+            }
+            service_stw_full_cycle(cause);
+            break;
           }
-          service_stw_full_cycle(cause);
-          break;
-        default:
-          ShouldNotReachHere();
+          default: {
+            ShouldNotReachHere();
+          }
+        }
       }
 
       // If this was the requested GC cycle, notify waiters about it

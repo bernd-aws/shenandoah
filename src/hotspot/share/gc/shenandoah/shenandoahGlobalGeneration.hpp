@@ -33,6 +33,8 @@ public:
   ShenandoahGlobalGeneration() : ShenandoahGeneration(GLOBAL) { }
 
 public:
+  virtual const char* name() const;
+
   size_t max_capacity() const override;
 
   virtual size_t soft_max_capacity() const;

@@ -31,6 +31,9 @@
 #include "gc/shenandoah/shenandoahGlobalGeneration.hpp"
 #include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
 
+const char* ShenandoahGlobalGeneration::name() const {
+  return "global";
+}
 
 size_t ShenandoahGlobalGeneration::max_capacity() const {
   return ShenandoahHeap::heap()->max_capacity();
