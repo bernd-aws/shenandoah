@@ -231,17 +231,24 @@ private:
   ShenandoahRegionIterator* _regions;
   ShenandoahMarkingContext* _marking_context;
 public:
+  volatile size_t _used;
+
   ShenandoahPromoteTenuredRegionsTask(ShenandoahRegionIterator* regions) :
     AbstractGangTask("Shenandoah Promote Tenured Regions"),
-    _regions(regions) {
+    _regions(regions),
+    _used(0) {
   }
 
   void work(uint worker_id) {
     ShenandoahParallelWorkerSession worker_session(worker_id);
     ShenandoahHeapRegion* r = _regions->next();
     while (r != NULL) {
-      if (r->is_young() && r->age() >= InitialTenuringThreshold && !r->is_humongous_continuation()) {
-        r->promote();
+      if (r->is_young()) {
+        if (r->age() >= InitialTenuringThreshold && !r->is_humongous_continuation()) {
+          r->promote();
+        } else {
+          Atomic::add(&_used, r->used());
+        }
       }
       r = _regions->next();
     }
@@ -252,6 +259,7 @@ void ShenandoahYoungGeneration::promote_tenured_regions() {
   ShenandoahRegionIterator regions;
   ShenandoahPromoteTenuredRegionsTask task(&regions);
   ShenandoahHeap::heap()->workers()->run_task(&task);
+  _used = task._used;
 }
 
 void ShenandoahYoungGeneration::promote_all_regions() {
