@@ -32,7 +32,7 @@
 #include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
 
 const char* ShenandoahGlobalGeneration::name() const {
-  return "global";
+  return "GLOBAL";
 }
 
 size_t ShenandoahGlobalGeneration::max_capacity() const {
@@ -48,7 +48,7 @@ size_t ShenandoahGlobalGeneration::soft_max_capacity() const {
 }
 
 size_t ShenandoahGlobalGeneration::used() const {
-  return ShenandoahHeap::heap()->free_set()->used();
+  return ShenandoahHeap::heap()->used();
 }
 
 size_t ShenandoahGlobalGeneration::available() const {

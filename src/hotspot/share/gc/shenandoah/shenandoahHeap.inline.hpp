@@ -267,7 +267,8 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
   assert(!r->is_humongous(), "never evacuate humongous objects");
 
   ShenandoahRegionAffiliation target_gen = r->affiliation();
-  if (mode()->is_generational() && ShenandoahPromoteTenuredObjects && target_gen == YOUNG_GENERATION) {
+  if (mode()->is_generational() && ShenandoahHeap::heap()->is_gc_generation_young() &&
+      target_gen == YOUNG_GENERATION && ShenandoahPromoteTenuredObjects) {
     markWord mark = p->mark();
     if (mark.is_marked()) {
       // Already forwarded.
