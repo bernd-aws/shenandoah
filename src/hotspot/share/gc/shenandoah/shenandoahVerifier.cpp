@@ -967,7 +967,7 @@ private:
       oop obj = CompressedOops::decode_not_null(o);
       ShenandoahHeap* heap = ShenandoahHeap::heap();
 
-      if (!heap->marking_context()->is_marked(obj)) {
+      if (!heap->marking_context()->is_marked_or_old(obj)) {
         ShenandoahAsserts::print_failure(ShenandoahAsserts::_safe_all, obj, p, NULL,
                 "Verify Roots In To-Space", "Should be marked", __FILE__, __LINE__);
       }

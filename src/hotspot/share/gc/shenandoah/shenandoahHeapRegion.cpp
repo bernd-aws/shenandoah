@@ -718,9 +718,9 @@ void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affil
 
 class UpdateCardValuesClosure : public BasicOopIterateClosure {
 private:
-  void update_card_value(oop obj) {
+  void update_card_value(void* address, oop obj) {
     if (ShenandoahHeap::heap()->is_in_young(obj)) {
-      volatile CardTable::CardValue* card_value = ShenandoahBarrierSet::barrier_set()->card_table()->byte_for(obj);
+      volatile CardTable::CardValue* card_value = ShenandoahBarrierSet::barrier_set()->card_table()->byte_for(address);
       *card_value = CardTable::dirty_card_val();
     }
   }
@@ -729,7 +729,7 @@ public:
   void do_oop(oop* p) {
     oop obj = *p;
     if (obj != NULL) {
-      update_card_value(obj);
+      update_card_value(p, obj);
     }
   }
 
@@ -738,7 +738,7 @@ public:
     if (!CompressedOops::is_null(o)) {
       oop obj = CompressedOops::decode_not_null(o);
       assert(oopDesc::is_oop(obj), "must be a valid oop");
-      update_card_value(obj);
+      update_card_value(p, obj);
     }
   }
 };
@@ -759,13 +759,13 @@ void ShenandoahHeapRegion::promote() {
     int index_limit = index() + ShenandoahHeapRegion::required_regions(obj->size() * HeapWordSize);
     for (int i = index(); i < index_limit; i++) {
       ShenandoahHeapRegion* r = heap->get_region(i);
-      printf("promoting region %lu, from %lx to %lx\n", r->index(), (size_t) r->bottom(), (size_t) r->top());
+      log_debug(gc)("promoting region %lu, clear cards from %lx to %lx", r->index(), (size_t) r->bottom(), (size_t) r->top());
       ShenandoahBarrierSet::barrier_set()->card_table()->clear_MemRegion(MemRegion(r->bottom(), r->end()));
       r->set_affiliation(OLD_GENERATION);
     }
     obj->oop_iterate(&update_card_values);
   } else {
-    printf("promoting region %lu, from %lx to %lx\n", index(), (size_t) bottom(), (size_t) top());
+    log_debug(gc)("promoting region %lu, clear cards from %lx to %lx", index(), (size_t) bottom(), (size_t) top());
     assert(!is_humongous_continuation(), "should not promote humongous object continuation in isolation");
     ShenandoahBarrierSet::barrier_set()->card_table()->clear_MemRegion(MemRegion(bottom(), end()));
     set_affiliation(OLD_GENERATION);
@@ -782,5 +782,4 @@ void ShenandoahHeapRegion::promote() {
       }
     }
   }
-  fflush(stdout);
 }
