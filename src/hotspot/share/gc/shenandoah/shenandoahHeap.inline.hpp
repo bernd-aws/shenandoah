@@ -285,7 +285,7 @@ inline oop ShenandoahHeap::evacuate_object(oop p, Thread* thread) {
         // or other alternatives like deferred card marking or scanning.
         // We should revisit this.
         // Furthermore, the object start should be registered for remset scanning.
-        MemRegion mr(cast_from_oop<HeapWord*>(p), p->size());
+        MemRegion mr(cast_from_oop<HeapWord*>(result), result->size());
         ShenandoahBarrierSet::barrier_set()->card_table()->invalidate(mr);
         return result;
       }
