@@ -97,12 +97,7 @@ size_t ShenandoahYoungGeneration::max_capacity() const {
 }
 
 size_t ShenandoahYoungGeneration::used_regions_size() const {
-  size_t used_regions_size = _affiliated_region_count * ShenandoahHeapRegion::region_size_bytes();
-
-  assert(used() <= used_regions_size, "Must not use more than we have - used: " SIZE_FORMAT ", used_regions_size: " SIZE_FORMAT,
-         used(), used_regions_size);
-
-  return used_regions_size;
+  return _affiliated_region_count * ShenandoahHeapRegion::region_size_bytes();
 }
 
 size_t ShenandoahYoungGeneration::available() const {
