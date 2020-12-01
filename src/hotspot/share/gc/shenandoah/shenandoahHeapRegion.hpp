@@ -359,7 +359,7 @@ public:
 
   void recycle();
 
-  void oop_iterate(OopIterateClosure* cl);
+  void oop_iterate(OopIterateClosure* cl, bool fill_dead_objects = false);
 
   HeapWord* block_start(const void* p) const;
   size_t block_size(const HeapWord* p) const;
@@ -407,7 +407,7 @@ private:
   void do_commit();
   void do_uncommit();
 
-  void oop_iterate_objects(OopIterateClosure* cl);
+  void oop_iterate_objects(OopIterateClosure* cl, bool fill_dead_objects);
   void oop_iterate_humongous(OopIterateClosure* cl);
 
   inline void internal_increase_live_data(size_t s);

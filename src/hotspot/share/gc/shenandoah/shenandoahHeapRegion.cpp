@@ -400,24 +400,43 @@ void ShenandoahHeapRegion::print_on(outputStream* st) const {
   st->cr();
 }
 
-void ShenandoahHeapRegion::oop_iterate(OopIterateClosure* blk) {
+void ShenandoahHeapRegion::oop_iterate(OopIterateClosure* blk, bool fill_dead_objects) {
   if (!is_active()) return;
   if (is_humongous()) {
     oop_iterate_humongous(blk);
   } else {
-    oop_iterate_objects(blk);
+    oop_iterate_objects(blk, fill_dead_objects);
   }
 }
 
-void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk) {
+void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk, bool fill_dead_objects) {
   assert(! is_humongous(), "no humongous region here");
   HeapWord* obj_addr = bottom();
   HeapWord* t = top();
   // Could call objects iterate, but this is easier.
-  while (obj_addr < t) {
-    oop obj = oop(obj_addr);
-    assert(obj->klass() != NULL, "klass must not be NULL");
-    obj_addr += obj->oop_iterate_size(blk);
+  if (!fill_dead_objects) {
+    while (obj_addr < t) {
+      oop obj = oop(obj_addr);
+      assert(obj->klass() != NULL, "klass must not be NULL");
+      obj_addr += obj->oop_iterate_size(blk);
+    }
+  } else {
+
+    // This can only really be done after marking is complete.
+    ShenandoahHeap* heap = ShenandoahHeap::heap();
+    ShenandoahMarkingContext* marking_context = heap->complete_marking_context();
+    assert(marking_context->is_complete(), "sanity");
+
+    while (obj_addr < top()) {
+      oop obj = oop(obj_addr);
+      if (marking_context->is_marked(obj)) {
+        assert(obj->klass() != NULL, "klass should not be NULL");
+        obj_addr += obj->oop_iterate_size(blk);
+      } else {
+        ShenandoahHeap::fill_with_object(obj_addr, obj->size());
+        obj_addr += obj->size();
+      }
+    }
   }
 }
 

@@ -2438,12 +2438,20 @@ private:
 
       if (r->is_active() && !r->is_cset()) {
         if (!_concurrent || !_heap->is_gc_generation_young() || r->affiliation() == YOUNG_GENERATION) {
-          _heap->marked_object_oop_iterate(r, &cl, update_watermark);
+          if (r->affiliation() == YOUNG_GENERATION) {
+            _heap->marked_object_oop_iterate(r, &cl, update_watermark);
+          } else {
+            assert(r->affiliation() == OLD_GENERATION, "Should not be updating references on FREE regions");
+            // This is an old region in a global collect cycle. We need to make sure
+            // that the initial mark on the next cycle does not iterate dead objects
+            // which haven't had their references updated.
+            r->oop_iterate(&cl, true);
+          }
         } else {
           // TODO: Replace this STW card scanning with a concurrent evac pass.
           if (ShenandoahUseSimpleCardScanning) {
             if (ShenandoahBarrierSet::barrier_set()->card_table()->is_dirty(MemRegion(r->bottom(), r->top()))) {
-              r->oop_iterate(&cl);
+              r->oop_iterate(&cl, false);
             }
           } else {
             // Note that we use this code even if we are doing an old-gen collection and we have a bitmap to
