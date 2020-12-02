@@ -337,6 +337,14 @@ inline oop ShenandoahHeap::try_evacuate_object(oop p, Thread* thread, Shenandoah
   if (target_gen == YOUNG_GENERATION) {
     // Increment the age in young copies, absorbing region age.
     // (Only retired regions will have more than zero age to pass along.)
+
+#ifdef TRACE_PROMOTION
+    printf("increasing young-gen object %llx age of %d by %d\n",
+           (unsigned long long) cast_from_oop<HeapWord *>(copy_val),
+           ShenandoahHeap::object_age(copy_val), from_region->age() + 1);
+    fflush(stdout);
+#endif
+
     ShenandoahHeap::increase_object_age(copy_val, from_region->age() + 1);
 
     // Note that p may have been forwarded by another thread,
@@ -355,6 +363,7 @@ inline oop ShenandoahHeap::try_evacuate_object(oop p, Thread* thread, Shenandoah
     if (target_gen == OLD_GENERATION) {
       printf("young-gen object %llx promoted to old-gen %llx\n",
              (unsigned long long) cast_from_oop<HeapWord *>(p), (unsigned long long) copy);
+      fflush(stdout);
     }
 #endif
 
@@ -371,9 +380,30 @@ inline oop ShenandoahHeap::try_evacuate_object(oop p, Thread* thread, Shenandoah
     // do this. For non-GCLAB allocations, we have no way to retract the allocation, and
     // have to explicitly overwrite the copy with the filler object. With that overwrite,
     // we have to keep the fwdptr initialized and pointing to our (stale) copy.
+
+#ifdef TRACE_PROMOTION
+      if (target_gen == OLD_GENERATION) {
+        printf("young-gen object %llx failed to promote to old-gen %llx; other thread won race!\n",
+               (unsigned long long) cast_from_oop<HeapWord *>(p), (unsigned long long) copy);
+        fflush(stdout);
+    }
+#endif
+
     if (alloc_from_gclab) {
+#ifdef TRACE_PROMOTION
+      if (target_gen == OLD_GENERATION) {
+        printf(" ... undoing gclab allocation\n");
+        fflush(stdout);
+      }
+#endif
       ShenandoahThreadLocalData::gclab(thread)->undo_allocation(copy, size);
     } else {
+#ifdef TRACE_PROMOTION
+      if (target_gen == OLD_GENERATION) {
+        printf(" ... filling abandoned copy with innocence\n");
+        fflush(stdout);
+      }
+#endif
       fill_with_object(copy, size);
       shenandoah_assert_correct(NULL, copy_val);
     }

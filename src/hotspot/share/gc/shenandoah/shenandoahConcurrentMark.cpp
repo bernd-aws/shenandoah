@@ -53,6 +53,8 @@
 #include "oops/oop.inline.hpp"
 #include "runtime/handles.inline.hpp"
 
+#undef DEBUG_TRACE
+
 template<GenerationMode GENERATION, UpdateRefsMode UPDATE_REFS>
 class ShenandoahInitMarkRootsClosure : public OopClosure {
 private:
@@ -149,7 +151,8 @@ public:
           for (r = worker_id % _nworkers; r < total_regions; r += _nworkers) {
             ShenandoahHeapRegion *region = heap->get_region(r);
             if (region->affiliation() == OLD_GENERATION) {
-              uint32_t start_cluster_no = rs->cluster_for_addr(region->bottom());
+              HeapWord *start_of_range = region->bottom();
+              uint32_t start_cluster_no = rs->cluster_for_addr(start_of_range);
 
 	      // region->end() represents the end of memory spanned by this region, but not all of this
 	      //   memory is eligible to be scanned because some of this memory has not yet been allocated.
@@ -157,16 +160,24 @@ public:
 	      // region->top() represents the end of allocated memory within this region.  Any addresses
 	      //   beyond region->top() should not be scanned as that memory does not hold valid objects.
 	      HeapWord *end_of_range = region->top();
-              uint32_t stop_cluster_no  = rs->cluster_for_addr(end_of_range);
+
+              // end_of_range may point to the middle of a cluster because region->top() may be different than region->end.
+              // We want to assure that our process_clusters() request spans all relevant clusters.  Note that each cluster
+              // processed will avoid processing beyond end_of_range.
+
+              size_t num_heapwords = end_of_range - start_of_range;
+              uint32_t num_clusters = (uint32_t)
+                  ((num_heapwords - 1 + CardTable::card_size_in_words * ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster)
+                   / (CardTable::card_size_in_words * ShenandoahCardCluster<ShenandoahDirectCardMarkRememberedSet>::CardsPerCluster));
 
 #ifdef DEBUG_TRACE
-	      printf("preparing to issue invocation of process_clusters for worker: %u, start_cluster_no: %u, stop_cluster_no: %u\n",
-		     worker_id, start_cluster_no, stop_cluster_no);
+	      printf("preparing to issue invocation of process_clusters for worker: %u, start_cluster_no: %u, scanning %u clusters\n",
+		     worker_id, start_cluster_no, num_clusters);
+              printf("  for range: %llx to %llx\n", (unsigned long long) start_of_range, (unsigned long long) end_of_range);
               fflush(stdout);
 #endif
               rs->process_clusters<ShenandoahInitMarkRootsClosure<YOUNG, UPDATE_REFS>>(worker_id, rp, _scm, start_cluster_no,
-										       stop_cluster_no + 1 - start_cluster_no,
-										       end_of_range, &mark_cl);
+										       num_clusters, end_of_range, &mark_cl);
             }
           }
         }

@@ -44,6 +44,8 @@
 #include "runtime/os.hpp"
 #include "runtime/safepoint.hpp"
 
+#undef DEBUG_TRACE
+
 size_t ShenandoahHeapRegion::RegionCount = 0;
 size_t ShenandoahHeapRegion::RegionSizeBytes = 0;
 size_t ShenandoahHeapRegion::RegionSizeWords = 0;
@@ -453,6 +455,11 @@ void ShenandoahHeapRegion::recycle() {
   set_update_watermark(bottom());
 
   make_empty();
+#ifdef DEBUG_TRACE
+  printf("SHR::recycle(), setting region (%llx, %llx, %llx) to FREE\n",
+         (unsigned long long) bottom(), (unsigned long long) top(), (unsigned long long) end());
+  fflush(stdout);
+#endif
   set_affiliation(FREE);
 
   if (ZapUnusedHeapArea) {
@@ -461,6 +468,11 @@ void ShenandoahHeapRegion::recycle() {
 }
 
 HeapWord* ShenandoahHeapRegion::block_start(const void* p) const {
+#ifdef DEBUG_TRACE
+  printf("block_start(%llx) looking within region %llx - %llx (%llx): \n",
+         (unsigned long long) p, (unsigned long long) bottom(), (unsigned long long) top(), (unsigned long long) end());
+  fflush(stdout);
+#endif
   assert(MemRegion(bottom(), end()).contains(p),
          "p (" PTR_FORMAT ") not in space [" PTR_FORMAT ", " PTR_FORMAT ")",
          p2i(p), p2i(bottom()), p2i(end()));
@@ -470,10 +482,19 @@ HeapWord* ShenandoahHeapRegion::block_start(const void* p) const {
     HeapWord* last = bottom();
     HeapWord* cur = last;
     while (cur <= p) {
+#ifdef DEBUG_TRACE
+      printf("  block_start examining @%llx of byte size %llx\n",
+             (unsigned long long) cur, (unsigned long long) 8 * oop(cur)->size());
+      fflush(stdout);
+#endif
       last = cur;
       cur += oop(cur)->size();
     }
     shenandoah_assert_correct(NULL, oop(last));
+#ifdef DEBUG_TRACE
+    printf("block_start(%llx) returning %llx\n", (unsigned long long) p, (unsigned long long) last);
+    fflush(stdout);
+#endif
     return last;
   }
 }
@@ -761,13 +782,25 @@ void ShenandoahHeapRegion::promote() {
       ShenandoahHeapRegion* r = heap->get_region(i);
       log_debug(gc)("promoting region %lu, clear cards from %lx to %lx", r->index(), (size_t) r->bottom(), (size_t) r->top());
       ShenandoahBarrierSet::barrier_set()->card_table()->clear_MemRegion(MemRegion(r->bottom(), r->end()));
+#ifdef DEBUG_TRACE
+      printf("promoting humongous region (%llx, %llx, %llx), setting affiliation to OLD_GENERATION\n",
+             (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end());
+      fflush(stdout);
+#endif
       r->set_affiliation(OLD_GENERATION);
     }
+    // Iterate over all humongous regions that are spanned by the humongous object obj.  The remnant
+    // of memory in the last humongous region that is not spanned by obj is currently not used.
     obj->oop_iterate(&update_card_values);
   } else {
     log_debug(gc)("promoting region %lu, clear cards from %lx to %lx", index(), (size_t) bottom(), (size_t) top());
     assert(!is_humongous_continuation(), "should not promote humongous object continuation in isolation");
     ShenandoahBarrierSet::barrier_set()->card_table()->clear_MemRegion(MemRegion(bottom(), end()));
+#ifdef DEBUG_TRACE
+    printf("promoting normal region (%llx, %llx, %llx), setting affiliation to OLD_GENERATION\n",
+           (unsigned long long) bottom(), (unsigned long long) top(), (unsigned long long) end());
+    fflush(stdout);
+#endif
     set_affiliation(OLD_GENERATION);
 
     HeapWord* obj_addr = bottom();

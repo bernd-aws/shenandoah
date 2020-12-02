@@ -745,6 +745,8 @@ public:
 
   void deduplicate_string(oop str);
 
+  static uint object_age(oop obj);
+
   static void increase_object_age(oop obj, uint additional_age);
 
 private:

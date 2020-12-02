@@ -32,6 +32,8 @@
 #include "logging/logStream.hpp"
 #include "runtime/orderAccess.hpp"
 
+#undef DEBUG_TRACE
+
 ShenandoahFreeSet::ShenandoahFreeSet(ShenandoahHeap* heap, size_t max_regions) :
   _heap(heap),
   _mutator_free_bitmap(max_regions, mtGC),
@@ -150,6 +152,13 @@ HeapWord* ShenandoahFreeSet::try_allocate_in(ShenandoahHeapRegion* r, Shenandoah
   try_recycle_trashed(r);
 
   if (r->affiliation() == ShenandoahRegionAffiliation::FREE) {
+#ifdef DEBUG_TRACE
+    if (req.affiliation() == ShenandoahRegionAffiliation::OLD_GENERATION) {
+      printf("try_allocate_in(), converting region @ (%llx, %llx, %llx) to OLD_GENERATION\n",
+             (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end());
+      fflush(stdout);
+    }
+#endif
     r->set_affiliation(req.affiliation());
   } else if (r->affiliation() != req.affiliation()) {
     return NULL;
@@ -316,6 +325,13 @@ HeapWord* ShenandoahFreeSet::allocate_contiguous(ShenandoahAllocRequest& req) {
     }
 
     r->set_top(r->bottom() + used_words);
+#ifdef DEBUG_TRACE
+    if (req.affiliation() == ShenandoahRegionAffiliation::OLD_GENERATION) {
+        printf("allocate_contiguous(), setting region (%llx, %llx, %llx) to OLD_GENERATION\n",
+               (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end());
+        fflush(stdout);
+    }
+#endif
     r->set_affiliation(req.affiliation());
 
     _mutator_free_bitmap.clear_bit(r->index());

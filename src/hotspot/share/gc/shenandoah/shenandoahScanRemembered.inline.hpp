@@ -128,8 +128,13 @@ ShenandoahCardCluster<RememberedSet>::has_object(uint32_t card_index) {
   ShenandoahHeap *heap = ShenandoahHeap::heap();
   ShenandoahHeapRegion *region = heap->heap_region_containing(addr);
 
-  // Apparently, region->block_start(addr) is not robust to inquiries beyond top() and it crashes.
+  // region->block_start(addr) is not robust to inquiries beyond top() and it crashes.
   if (region->top() <= addr)
+    return false;
+
+  // region->block_start(addr) is also not robust to inquiries within a humongous continuation region.
+  // if region is humongous continuation, no object starts within it.
+  if (region->is_humongous_continuation())
     return false;
 
   HeapWord *obj = region->block_start(addr);
@@ -383,6 +388,7 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint worker_id, Refere
           // Scan all objects that start within this card region.
           uint32_t start_offset = _scc->get_first_start(card_index);
           HeapWord *p = _scc->addr_for_card_index(card_index);
+          HeapWord *card_start = p;
           HeapWord *endp = p + CardTable::card_size_in_words;
           if (endp > end_of_range) {
 #ifdef DEBUG_TRACE
@@ -394,7 +400,10 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint worker_id, Refere
           } else {
             // endp either points to start of next card region, or to the next object that needs to be scanned, which may
             // reside in some successor card region.
-            next_card_index = _scc->card_index_for_addr(endp);
+
+            // Can't use _scc->card_index_for_addr(endp) here because it crashes with assertion
+            // failure if endp points to end of heap.
+            next_card_index = card_index + (endp - card_start) / CardTable::card_size_in_words;
           }
 
           p += start_offset;
@@ -466,10 +475,14 @@ ShenandoahScanRemembered<RememberedSet>::process_clusters(uint worker_id, Refere
         // Scan the last object that starts within this card memory if it spans at least one dirty card within this cluster
         // or if it reaches into the next cluster. 
         uint32_t start_offset = _scc->get_last_start(card_index);
-        HeapWord *p = _scc->addr_for_card_index(card_index) + start_offset;
+        HeapWord *card_start = _scc->addr_for_card_index(card_index);
+        HeapWord *p = card_start + start_offset;
         oop obj = oop(p);
         HeapWord *nextp = p + obj->size();
-        uint32_t last_card = _scc->card_index_for_addr(nextp);
+
+        // Can't use _scc->card_index_for_addr(endp) here because it crashes with assertion
+        // failure if nextp points to end of heap.
+        uint32_t last_card = card_index + (nextp - card_start) / CardTable::card_size_in_words;
         
         bool reaches_next_cluster = (last_card > end_card_index);
         bool spans_dirty_within_this_cluster = false;

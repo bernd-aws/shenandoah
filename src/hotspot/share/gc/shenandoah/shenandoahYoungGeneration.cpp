@@ -32,6 +32,8 @@
 #include "gc/shenandoah/shenandoahYoungGeneration.hpp"
 #include "gc/shenandoah/heuristics/shenandoahHeuristics.hpp"
 
+#undef TRACE_PROMOTION
+
 ShenandoahYoungGeneration::ShenandoahYoungGeneration() : ShenandoahGeneration(YOUNG),
   _affiliated_region_count(0),
   _used(0) {
@@ -244,6 +246,11 @@ public:
     while (r != NULL) {
       if (r->is_young()) {
         if (r->age() >= InitialTenuringThreshold && !r->is_humongous_continuation()) {
+#ifdef TRACE_PROMOTION
+          printf("Promoting region of age %d, spanning %llx to %llx (%llx)\n", r->age(), 
+                 (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end());
+          fflush(stdout);
+#endif
           r->promote();
         } else {
           Atomic::add(&_used, r->used());
@@ -266,6 +273,11 @@ void ShenandoahYoungGeneration::promote_all_regions() {
   for (size_t index = 0; index < heap->num_regions(); index++) {
     ShenandoahHeapRegion* r = heap->get_region(index);
     if (r->is_young()) {
+#ifdef TRACE_PROMOTION
+      printf("promote_all_regions(), setting region (%llx, %llx, %llx) to OLD_GENERATION\n",
+             (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end());
+      fflush(stdout);
+#endif
       r->set_affiliation(ShenandoahRegionAffiliation::OLD_GENERATION);
     }
   }
