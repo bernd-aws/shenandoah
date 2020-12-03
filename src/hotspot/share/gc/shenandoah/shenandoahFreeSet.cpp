@@ -29,6 +29,7 @@
 #include "gc/shenandoah/shenandoahHeapRegionSet.hpp"
 #include "gc/shenandoah/shenandoahMarkingContext.inline.hpp"
 #include "gc/shenandoah/shenandoahYoungGeneration.hpp"
+#include "gc/shenandoah/shenandoahBarrierSet.hpp"
 #include "logging/logStream.hpp"
 #include "runtime/orderAccess.hpp"
 
@@ -101,8 +102,19 @@ HeapWord* ShenandoahFreeSet::allocate_single(ShenandoahAllocRequest& req, bool& 
       for (size_t c = _collector_rightmost + 1; c > _collector_leftmost; c--) {
         size_t idx = c - 1;
         if (is_collector_free(idx)) {
-          HeapWord* result = try_allocate_in(_heap->get_region(idx), req, in_new_region);
+          ShenandoahHeapRegion* r = _heap->get_region(idx);
+          if (r->is_young() && req.is_old()) {
+            // We don't want to cannibalize a young region to satisfy
+            // an evacuation from an old region.
+            continue;
+          }
+          HeapWord* result = try_allocate_in(r, req, in_new_region);
           if (result != NULL) {
+            if (r->is_old()) {
+              // HEY! This is a very coarse card marking. We hope to repair
+              // such cards during remembered set scanning.
+              ShenandoahBarrierSet::barrier_set()->card_table()->dirty_MemRegion(MemRegion(result, req.actual_size()));
+            }
             return result;
           }
         }
@@ -119,9 +131,16 @@ HeapWord* ShenandoahFreeSet::allocate_single(ShenandoahAllocRequest& req, bool& 
         if (is_mutator_free(idx)) {
           ShenandoahHeapRegion* r = _heap->get_region(idx);
           if (can_allocate_from(r)) {
+            if (r->is_young() && req.is_old()) {
+              continue;
+            }
+
             flip_to_gc(r);
             HeapWord *result = try_allocate_in(r, req, in_new_region);
             if (result != NULL) {
+              if (r->is_old()) {
+                ShenandoahBarrierSet::barrier_set()->card_table()->dirty_MemRegion(MemRegion(result, req.actual_size()));
+              }
               return result;
             }
           }

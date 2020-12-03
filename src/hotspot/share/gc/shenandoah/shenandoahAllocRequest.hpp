@@ -166,6 +166,14 @@ public:
     }
   }
 
+  bool is_old() {
+    return _affiliation == OLD_GENERATION;
+  }
+
+  bool is_young() {
+    return _affiliation == YOUNG_GENERATION;
+  }
+
   ShenandoahRegionAffiliation affiliation() const {
     return _affiliation;
   }
