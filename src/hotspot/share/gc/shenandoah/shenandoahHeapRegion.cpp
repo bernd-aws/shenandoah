@@ -410,33 +410,41 @@ void ShenandoahHeapRegion::oop_iterate(OopIterateClosure* blk, bool fill_dead_ob
 }
 
 void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk, bool fill_dead_objects) {
-  assert(! is_humongous(), "no humongous region here");
+  assert(!is_humongous(), "no humongous region here");
   HeapWord* obj_addr = bottom();
   HeapWord* t = top();
-  // Could call objects iterate, but this is easier.
+
   if (!fill_dead_objects) {
     while (obj_addr < t) {
       oop obj = oop(obj_addr);
-      assert(obj->klass() != NULL, "klass must not be NULL");
+      assert(obj->klass() != NULL, "klass should not be NULL");
       obj_addr += obj->oop_iterate_size(blk);
     }
   } else {
-
-    // This can only really be done after marking is complete.
     ShenandoahHeap* heap = ShenandoahHeap::heap();
     ShenandoahMarkingContext* marking_context = heap->complete_marking_context();
     assert(marking_context->is_complete(), "sanity");
 
-    while (obj_addr < top()) {
+    HeapWord* fill_addr = NULL;
+    size_t fill_size;
+    while (obj_addr < t) {
       oop obj = oop(obj_addr);
       if (marking_context->is_marked(obj)) {
+        if (fill_addr != NULL) {
+          ShenandoahHeap::fill_with_object(fill_addr, fill_size);
+          fill_addr = NULL;
+        }
         assert(obj->klass() != NULL, "klass should not be NULL");
         obj_addr += obj->oop_iterate_size(blk);
+      } else if (fill_addr == NULL) {
+        fill_addr = obj_addr;
+        fill_size = obj->size();
       } else {
-        int size = obj->size();
-        ShenandoahHeap::fill_with_object(obj_addr, size);
-        obj_addr += size;
+        fill_size += obj->size();
       }
+    }
+    if (fill_addr != NULL) {
+      ShenandoahHeap::fill_with_object(fill_addr, fill_size);
     }
   }
 }
@@ -823,16 +831,6 @@ void ShenandoahHeapRegion::promote() {
 #endif
     set_affiliation(OLD_GENERATION);
 
-    HeapWord* obj_addr = bottom();
-    while (obj_addr < top()) {
-      oop obj = oop(obj_addr);
-      if (marking_context->is_marked(obj)) {
-        assert(obj->klass() != NULL, "klass should not be NULL");
-        obj_addr += obj->oop_iterate_size(&update_card_values);
-      } else {
-        ShenandoahHeap::fill_with_object(obj_addr, obj->size());
-        obj_addr += obj->size();
-      }
-    }
+    oop_iterate_objects(&update_card_values, /*fill_dead_objects*/ true);
   }
 }
