@@ -2442,53 +2442,24 @@ private:
         } else {
           assert(r->affiliation() == OLD_GENERATION, "Should not be updating references on FREE regions");
           if (!_heap->is_gc_generation_young()) {
-            // This is an old region in a global collection cycle. We need to make sure
-            // that the initial mark on the next cycle does not iterate dead objects
+            // Old region in a global cycle.
+            // We need to make sure that the next cycle does not iterate over dead objects
             // which haven't had their references updated.
             r->oop_iterate(&cl, /*fill_dead_objects*/ true);
           } else if (ShenandoahBarrierSet::barrier_set()->card_table()->is_dirty(MemRegion(r->bottom(), r->top()))) {
-            // This is an old region in an update refs pass of a young collection cycle.
-            // We don't have liveness information about this region.
-            // Update references from this region to young gen as indicated by the remembered set.
-            if (ShenandoahUseSimpleCardScanning) {
-                r->oop_iterate(&cl, /*fill_dead_objects*/ false);
+            // Old region in a young cycle.
+            if (r->is_humongous()) {
+              r->oop_iterate_humongous(&cl);
             } else {
-              // Note that we use this code even if we are doing an old-gen collection and we have a bitmap to
-              // represent marked objects within the heap region.
-              //
-              // It is necessary to process all objects, rather than just the marked objects, during update-refs of
-              // an old-gen region as part of an old-gen collection.  Otherwise, a subsequent update-refs scan of
-              // the same region will see stale pointers and crash.
-              //
-              // Kelvin believes (but has not confirmed) the following:
-              //   r->top() represents the upper end of memory that has been allocated within this region.
-              //       As new objects are allocated, the value of r->top() increases to accommodate each new
-              //       object.
-              //   r->get_update_watermark() represents the value that was held in r->top() at the start of
-              //       evacuation.  During evacuation, new objects may be allocated within this heap region
-              //       and this will cause r->top() to increase.  But any objects allocated during the evacuation
-              //       phase do not need to be scanned by update-refs because the to-space invariant is in force
-              //       during evacuation and this will assure that any objects residing between
-              //       r->get_update_watermark() and r->top() hold no pointers to from-space.
+              // We don't have liveness information about this region.
+              // Therefore we process all objects, rather than just marked ones.
+              // Otherwise subsequent traversals will encounter stale pointers.
 
               HeapWord *p = r->bottom();
               ShenandoahObjectToOopBoundedClosure<T> objs(&cl, p, update_watermark);
-
-              // TODO: This code assumes every object ever allocated within this old-gen region is still live.  If we
-              // allow a sweep phase to turn garbage objects into free memory regions, we need to modify this code to
-              // skip over and/or synchronize access to these free memory regions.  There might be races, for example,
-              // if we are trying to scan one of these free memory regions while a different thread is trying to
-              // allocate from within a free region.
-              //
-              // Reality is that this code is likely to be replaced with JVM-292 code before we ever get around to
-              // sweeping up garbage objects within old-gen memory.
-
-              // Anything beyond update_watermark is not yet allocated or initialized
+              // Anything beyond update_watermark is not yet allocated or initialized.
               while (p < update_watermark) {
                 oop obj = oop(p);
-
-                // The invocation of do_object() is "borrowed" from the implementation of
-                // ShenandoahHeap::marked_object_iterate(), which is called by _heap->marked_object_oop_iterate().
                 objs.do_object(obj);
                 p += obj->size();
               }
