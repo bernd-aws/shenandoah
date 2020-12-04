@@ -433,8 +433,9 @@ void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk, bool fill
         assert(obj->klass() != NULL, "klass should not be NULL");
         obj_addr += obj->oop_iterate_size(blk);
       } else {
-        ShenandoahHeap::fill_with_object(obj_addr, obj->size());
-        obj_addr += obj->size();
+        int size = obj->size();
+        ShenandoahHeap::fill_with_object(obj_addr, size);
+        obj_addr += size;
       }
     }
   }
