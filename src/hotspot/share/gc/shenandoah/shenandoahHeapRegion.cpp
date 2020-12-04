@@ -426,7 +426,7 @@ void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk, bool fill
     assert(marking_context->is_complete(), "sanity");
 
     HeapWord* fill_addr = NULL;
-    size_t fill_size;
+    size_t fill_size = 0;
     while (obj_addr < t) {
       oop obj = oop(obj_addr);
       if (marking_context->is_marked(obj)) {
@@ -436,11 +436,15 @@ void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk, bool fill
         }
         assert(obj->klass() != NULL, "klass should not be NULL");
         obj_addr += obj->oop_iterate_size(blk);
-      } else if (fill_addr == NULL) {
-        fill_addr = obj_addr;
-        fill_size = obj->size();
       } else {
-        fill_size += obj->size();
+        int size = obj->size();
+        if (fill_addr == NULL) {
+          fill_addr = obj_addr;
+          fill_size = size;
+        } else {
+          fill_size += size;
+        }
+        obj_addr += size;
       }
     }
     if (fill_addr != NULL) {
