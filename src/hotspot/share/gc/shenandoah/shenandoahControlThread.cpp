@@ -241,18 +241,12 @@ void ShenandoahControlThread::run_service() {
             if (log.is_enabled()) {
               log.print("DEGENERATE GC");
             }
-            if (heap->mode()->is_generational()) {
-              fatal("Degenerated cycles are not yet supported in generational mode.");
-            }
             service_stw_degenerated_cycle(cause, degen_point);
             break;
           }
           case stw_full: {
             if (log.is_enabled()) {
               log.print("FULL GC");
-            }
-            if (heap->mode()->is_generational()) {
-              fatal("Full cycles are not yet supported in generational mode.");
             }
             service_stw_full_cycle(cause);
             break;
