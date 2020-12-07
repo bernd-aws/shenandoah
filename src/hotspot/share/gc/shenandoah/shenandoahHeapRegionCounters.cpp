@@ -104,7 +104,8 @@ void ShenandoahHeapRegionCounters::update() {
           data |= ((100 * r->get_gclab_allocs() / rs)    & PERCENT_MASK) << GCLAB_SHIFT;
           data |= ((100 * r->get_shared_allocs() / rs)   & PERCENT_MASK) << SHARED_SHIFT;
 
-          data |= (r->age() & STATUS_MASK) << GENERATION_SHIFT;
+          data |= (r->age() & AGE_MASK) << AGE_SHIFT;
+          data |= (r->affiliation() & AFFILIATION_MASK) << AFFILIATION_SHIFT;
           data |= (r->state_ordinal() & STATUS_MASK) << STATUS_SHIFT;
           _regions_data[i]->set_value(data);
         }
