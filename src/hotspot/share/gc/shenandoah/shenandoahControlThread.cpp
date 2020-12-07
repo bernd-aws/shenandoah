@@ -223,14 +223,10 @@ void ShenandoahControlThread::run_service() {
         switch (mode) {
           case concurrent_normal: {
             if (generation == YOUNG) {
-              if (log.is_enabled()) {
-                log.print("YOUNG GC");
-              }
+              log_info(gc, ergo)("Start young GC cycle");
               service_concurrent_young_cycle(cause);
             } else {
-              if (log.is_enabled()) {
-                log.print("GLOBAL GC");
-              }
+              log_info(gc, ergo)("Start global GC cycle");
               service_concurrent_global_cycle(cause);
             }
             heap->young_generation()->log_status();
@@ -238,16 +234,12 @@ void ShenandoahControlThread::run_service() {
             break;
           }
           case stw_degenerated: {
-            if (log.is_enabled()) {
-              log.print("DEGENERATE GC");
-            }
+            log_info(gc, ergo)("Start degenerated GC cycle");
             service_stw_degenerated_cycle(cause, degen_point);
             break;
           }
           case stw_full: {
-            if (log.is_enabled()) {
-              log.print("FULL GC");
-            }
+            log_info(gc, ergo)("Start full GC cycle");
             service_stw_full_cycle(cause);
             break;
           }
