@@ -25,12 +25,20 @@ void ShenandoahFinalMarkUpdateRegionStateClosure::heap_region_do(ShenandoahHeapR
       }
     }
 
-    if (r->top() != r->get_update_watermark()) {
-      // There have been allocations in this region since the last GC cycle.
-      // Any objects new to this region must not assimilate elevated age.
-      r->reset_age();
-    } else {
-      r->increment_age();
+    if (ShenandoahHeap::heap()->mode()->is_generational()) {
+      // HEY! Allocations move the watermark when top moves, however compacting
+      // objects will sometimes lower top beneath the watermark, after which,
+      // attempts to read the watermark will assert out (watermark should not be
+      // higher than top). I think the right way™ to check for new allocations
+      // is to compare top with the TAMS as is done earlier in this function.
+      // if (r->top() != r->get_update_watermark()) {
+      if (top > tams) {
+        // There have been allocations in this region since the start of the cycle.
+        // Any objects new to this region must not assimilate elevated age.
+        r->reset_age();
+      } else {
+        r->increment_age();
+      }
     }
 
     // Remember limit for updating refs. It's guaranteed that we get no
