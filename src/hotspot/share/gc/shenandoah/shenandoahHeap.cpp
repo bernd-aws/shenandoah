@@ -2437,7 +2437,7 @@ private:
       assert (update_watermark >= r->bottom(), "sanity");
 
       if (r->is_active() && !r->is_cset()) {
-        if (r->affiliation() == YOUNG_GENERATION) {
+        if (r->affiliation() == YOUNG_GENERATION || !_heap->mode()->is_generational()) {
           _heap->marked_object_oop_iterate(r, &cl, update_watermark);
         } else {
           assert(r->affiliation() == OLD_GENERATION, "Should not be updating references on FREE regions");
