@@ -743,7 +743,12 @@ size_t ShenandoahHeapRegion::pin_count() const {
 
 void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affiliation) {
   ShenandoahHeap* heap = ShenandoahHeap::heap();
-  if (!heap->mode()->is_generational() || _affiliation == new_affiliation) {
+  if (_affiliation == new_affiliation) {
+    return;
+  }
+
+  if (!heap->mode()->is_generational()) {
+    _affiliation = new_affiliation;
     return;
   }
 
