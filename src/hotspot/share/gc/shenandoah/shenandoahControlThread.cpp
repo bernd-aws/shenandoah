@@ -229,7 +229,9 @@ void ShenandoahControlThread::run_service() {
               log_info(gc, ergo)("Start global GC cycle");
               service_concurrent_global_cycle(cause);
             }
-            heap->young_generation()->log_status();
+            if (heap->mode()->is_generational()) {
+              heap->young_generation()->log_status();
+            }
             heap->global_generation()->log_status();
             break;
           }
