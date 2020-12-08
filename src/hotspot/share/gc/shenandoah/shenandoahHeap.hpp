@@ -137,6 +137,11 @@ public:
     return &_lock;
   }
 
+  ShenandoahGeneration* active_generation() {
+    // last or latest generation might be a better name here.
+    return _gc_generation;
+  }
+
   void set_gc_generation(ShenandoahGeneration* generation) {
     _gc_generation = generation;
   }

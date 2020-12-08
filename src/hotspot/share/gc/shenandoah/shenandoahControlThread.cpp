@@ -625,7 +625,9 @@ void ShenandoahControlThread::service_stw_degenerated_cycle(GCCause::Cause cause
 
   GCIdMark gc_id_mark;
   ShenandoahHeap* heap = ShenandoahHeap::heap();
-  ShenandoahGeneration* generation = heap->global_generation();
+  // Whatever generation encountered the allocation failure should continue
+  // the degenerated cycle to preserve any associated state (marking stacks, e.g.).
+  ShenandoahGeneration* generation = heap->active_generation();
   ShenandoahGCSession session(cause, generation);
 
   heap->vmop_degenerated(point);

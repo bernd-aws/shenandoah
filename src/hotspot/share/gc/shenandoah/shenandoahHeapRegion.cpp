@@ -332,6 +332,9 @@ size_t ShenandoahHeapRegion::get_gclab_allocs() const {
 void ShenandoahHeapRegion::set_live_data(size_t s) {
   assert(Thread::current()->is_VM_thread(), "by VM thread");
   _live_data = (s >> LogHeapWordSize);
+  if (_affiliation == FREE) {
+    assert(_live_data == 0, "Setting non-zero live data (%zu) on FREE region", s);
+  }
 }
 
 void ShenandoahHeapRegion::print_on(outputStream* st) const {
@@ -759,6 +762,7 @@ void ShenandoahHeapRegion::set_affiliation(ShenandoahRegionAffiliation new_affil
   CardTable* card_table = ShenandoahBarrierSet::barrier_set()->card_table();
   switch (new_affiliation) {
     case FREE:
+      assert(!has_live(), "Free region should not have live data");
       card_table->clear_MemRegion(MemRegion(_bottom, _end));
       break;
     case YOUNG_GENERATION:
