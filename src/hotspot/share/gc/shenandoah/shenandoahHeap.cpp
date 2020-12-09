@@ -828,6 +828,12 @@ HeapWord* ShenandoahHeap::allocate_new_gclab(size_t min_size,
                                              size_t* actual_size) {
   ShenandoahAllocRequest req = ShenandoahAllocRequest::for_gclab(min_size, word_size);
   HeapWord* res = allocate_memory(req);
+#ifdef DEBUG_TRACE
+  printf("allocating a new gclab(min: %llx, desired: %llx) @ %llx, size: %lld\n",
+         (unsigned long long) min_size, (unsigned long long) word_size, (unsigned long long) res,
+         (unsigned long long) ((res == NULL)? 0: req.actual_size()) );
+  fflush(stdout);
+#endif
   if (res != NULL) {
     *actual_size = req.actual_size();
   } else {

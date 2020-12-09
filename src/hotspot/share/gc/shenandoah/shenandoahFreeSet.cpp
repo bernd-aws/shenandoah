@@ -139,6 +139,8 @@ HeapWord* ShenandoahFreeSet::allocate_single(ShenandoahAllocRequest& req, bool& 
             HeapWord *result = try_allocate_in(r, req, in_new_region);
             if (result != NULL) {
               if (r->is_old()) {
+                // HEY! This is a very coarse card marking. We hope to repair
+                // such cards during remembered set scanning.
                 ShenandoahBarrierSet::barrier_set()->card_table()->dirty_MemRegion(MemRegion(result, req.actual_size()));
               }
               return result;
@@ -160,6 +162,23 @@ HeapWord* ShenandoahFreeSet::allocate_single(ShenandoahAllocRequest& req, bool& 
   return NULL;
 }
 
+#ifdef DEBUG_TRACE
+static const char *affiliation_name(ShenandoahRegionAffiliation a) {
+
+  switch (a) {
+    case ShenandoahRegionAffiliation::FREE:
+        return "FREE";
+        break;
+    case ShenandoahRegionAffiliation::YOUNG_GENERATION:
+        return "YOUNG_GENERATION";
+    case ShenandoahRegionAffiliation::OLD_GENERATION:
+        return "OLD_GENERATION";
+    default:
+        return "UnrecognizedAffiliation";
+  }
+}
+#endif
+
 HeapWord* ShenandoahFreeSet::try_allocate_in(ShenandoahHeapRegion* r, ShenandoahAllocRequest& req, bool& in_new_region) {
   assert (!has_no_alloc_capacity(r), "Performance: should avoid full regions on this path: " SIZE_FORMAT, r->index());
 
@@ -172,11 +191,10 @@ HeapWord* ShenandoahFreeSet::try_allocate_in(ShenandoahHeapRegion* r, Shenandoah
 
   if (r->affiliation() == ShenandoahRegionAffiliation::FREE) {
 #ifdef DEBUG_TRACE
-    if (req.affiliation() == ShenandoahRegionAffiliation::OLD_GENERATION) {
-      printf("try_allocate_in(), converting region @ (%llx, %llx, %llx) to OLD_GENERATION\n",
-             (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end());
-      fflush(stdout);
-    }
+    printf("try_allocate_in(), converting region @ (%llx, %llx, %llx) to %s\n",
+           (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end(),
+           affiliation_name(req.affiliation()));
+    fflush(stdout);
 #endif
     r->set_affiliation(req.affiliation());
   } else if (r->affiliation() != req.affiliation()) {
@@ -345,11 +363,10 @@ HeapWord* ShenandoahFreeSet::allocate_contiguous(ShenandoahAllocRequest& req) {
 
     r->set_top(r->bottom() + used_words);
 #ifdef DEBUG_TRACE
-    if (req.affiliation() == ShenandoahRegionAffiliation::OLD_GENERATION) {
-        printf("allocate_contiguous(), setting region (%llx, %llx, %llx) to OLD_GENERATION\n",
-               (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end());
-        fflush(stdout);
-    }
+    printf("allocate_contiguous(), setting region (%llx, %llx, %llx) to %s\n",
+           (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end(),
+           affiliation_name(req.affiliation()));
+    fflush(stdout);
 #endif
     r->set_affiliation(req.affiliation());
 

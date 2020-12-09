@@ -37,6 +37,9 @@
 #include "oops/oop.inline.hpp"
 #include "runtime/prefetch.inline.hpp"
 
+#undef TRACE_MARKING
+#define START_TRACE_WITH_GC 8
+
 template <class T>
 void ShenandoahConcurrentMark::do_task(ShenandoahObjToScanQueue* q, T* cl, ShenandoahLiveData* live_data, ShenandoahMarkTask* task) {
   oop obj = task->obj();
@@ -46,6 +49,20 @@ void ShenandoahConcurrentMark::do_task(ShenandoahObjToScanQueue* q, T* cl, Shena
   shenandoah_assert_not_in_cset_except(NULL, obj, _heap->cancelled_gc());
 
   if (task->is_not_chunked()) {
+#ifdef TRACE_MARKING
+    if (GCId::current() >= START_TRACE_WITH_GC) {
+      if (obj->is_instance())
+        printf("SCM::do_task() processing unchunked obj %llx, which is an instance object\n",
+               (unsigned long long) cast_from_oop<HeapWord *>(obj));
+      else if (obj->is_objArray())
+        printf("SCM::do_task() processing unchunked obj %llx, which is an array of objects\n",
+               (unsigned long long) cast_from_oop<HeapWord *>(obj));
+      else
+        printf("SCM::do_task() processing unchunked obj %llx, which is an array of primitive data\n",
+               (unsigned long long) cast_from_oop<HeapWord *>(obj));
+      fflush(stdout);
+    }
+#endif
     if (obj->is_instance()) {
       // Case 1: Normal oop, process as usual.
       obj->oop_iterate(cl);
@@ -63,6 +80,12 @@ void ShenandoahConcurrentMark::do_task(ShenandoahObjToScanQueue* q, T* cl, Shena
     // Count liveness the last: push the outstanding work to the queues first
     count_liveness(live_data, obj);
   } else {
+#ifdef TRACE_MARKING
+    if (GCId::current() >= START_TRACE_WITH_GC) {
+      printf("SCM::do_task() processing chunk of array of references\n");
+      fflush(stdout);
+    }
+#endif
     // Case 4: Array chunk, has sensible chunk id. Process it.
     do_chunked_array<T>(q, cl, obj, task->chunk(), task->pow());
   }
@@ -224,20 +247,35 @@ public:
 template<class T, GenerationMode GENERATION, UpdateRefsMode UPDATE_REFS, StringDedupMode STRING_DEDUP>
 inline void ShenandoahConcurrentMark::mark_through_ref(T *p, ShenandoahHeap* heap, ShenandoahObjToScanQueue* q, ShenandoahMarkingContext* const mark_context) {
 
+#ifdef TRACE_MARKING
+  const char *update_refs_name = "UNEXPECTED";
+#endif
   T o = RawAccess<>::oop_load(p);
   if (!CompressedOops::is_null(o)) {
     oop obj = CompressedOops::decode_not_null(o);
     switch (UPDATE_REFS) {
     case NONE:
+#ifdef TRACE_MARKING
+      update_refs_name = "NONE";
+#endif
       break;
     case RESOLVE:
+#ifdef TRACE_MARKING
+      update_refs_name = "RESOLVE";
+#endif
       obj = ShenandoahBarrierSet::resolve_forwarded_not_null(obj);
       break;
     case SIMPLE:
+#ifdef TRACE_MARKING
+      update_refs_name = "SIMPLE";
+#endif
       // We piggy-back reference updating to the marking tasks.
       obj = heap->update_with_forwarded_not_null(p, obj);
       break;
     case CONCURRENT:
+#ifdef TRACE_MARKING
+      update_refs_name = "CONCURRENT";
+#endif
       obj = heap->maybe_update_with_forwarded_not_null(p, obj);
       break;
     default:
@@ -256,6 +294,15 @@ inline void ShenandoahConcurrentMark::mark_through_ref(T *p, ShenandoahHeap* hea
 
       if (GENERATION != YOUNG || heap->is_in_young(obj)) {
         if (mark_context->mark(obj)) {
+#ifdef TRACE_MARKING
+          // Kelvin believes UPDATE_REFS == NONE means we are initializing or doing concurrent scanning.  This
+          // same method may be invoked during update refs, but then UPDATE_REFS == RESOLVE.
+          if (GCId::current() >= START_TRACE_WITH_GC) {
+            printf("SCM: mark_through_ref<%s> just marked object %llx\n",
+                   update_refs_name, (unsigned long long) cast_from_oop<HeapWord *>(obj));
+            fflush(stdout);
+          }
+#endif
           bool pushed = q->push(ShenandoahMarkTask(obj));
           assert(pushed, "overflow queue should always succeed pushing");
 
@@ -264,11 +311,37 @@ inline void ShenandoahConcurrentMark::mark_through_ref(T *p, ShenandoahHeap* hea
             ShenandoahStringDedup::enqueue_candidate(obj);
           }
         }
-
+#ifdef TRACE_MARKING
+        else if (GCId::current() >= START_TRACE_WITH_GC) {
+          printf("SCM: mark_through_ref<%s> failed to mark object %llx (already marked)\n",
+                 update_refs_name, (unsigned long long) cast_from_oop<HeapWord *>(obj));
+          fflush(stdout);
+        }
+#endif
         shenandoah_assert_marked(p, obj);
       }
+#ifdef TRACE_MARKING
+      else if (GCId::current() >= START_TRACE_WITH_GC) {
+        printf("SCM: mark_through_ref<%s> ignores %llx because GENERATION == YOUNG and this object resides in OLD\n",
+             update_refs_name, (unsigned long long) cast_from_oop<HeapWord *>(obj));
+        fflush(stdout);
+      }
+#endif
     }
+#ifdef TRACE_MARKING
+    else if (GCId::current() >= START_TRACE_WITH_GC) {
+      printf("SCM: mark_through_ref<%s> ignores %llx because UPDATE_REFS is CONCURRENT and obj is NULL\n",
+             update_refs_name, (unsigned long long) cast_from_oop<HeapWord *>(obj));
+      fflush(stdout);
+    }
+#endif
   }
+#ifdef  TRACE_MARKING
+  else if (GCId::current() >= START_TRACE_WITH_GC) {
+    printf("SCM: mark_through_ref ignores because o is NULL\n");
+    fflush(stdout);
+  }
+#endif
 }
 
 #endif // SHARE_GC_SHENANDOAH_SHENANDOAHCONCURRENTMARK_INLINE_HPP

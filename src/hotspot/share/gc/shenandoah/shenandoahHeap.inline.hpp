@@ -299,6 +299,12 @@ inline oop ShenandoahHeap::try_evacuate_object(oop p, Thread* thread, Shenandoah
   HeapWord* copy = NULL;
   size_t size = p->size();
 
+#ifdef TRACE_PROMOTION
+  const char *source_region = ((from_region->affiliation() == YOUNG_GENERATION)? "young"
+                               : ((from_region->affiliation() == OLD_GENERATION)? "old": "free"));
+  const char *dest_region = (target_gen == OLD_GENERATION)? "old": "young";
+#endif
+
 #ifdef ASSERT
   if (ShenandoahOOMDuringEvacALot &&
       (os::random() & 1) == 0) { // Simulate OOM every ~2nd slow-path call
@@ -339,8 +345,9 @@ inline oop ShenandoahHeap::try_evacuate_object(oop p, Thread* thread, Shenandoah
     // (Only retired regions will have more than zero age to pass along.)
 
 #ifdef TRACE_PROMOTION
-    printf("increasing young-gen object %llx age of %d by %d\n",
+    printf("endeavoring to increase young-gen object %llx (previously known as %llx) age of %d by %d\n",
            (unsigned long long) cast_from_oop<HeapWord *>(copy_val),
+           (unsigned long long) cast_from_oop<HeapWord *>(p),
            ShenandoahHeap::object_age(copy_val), from_region->age() + 1);
     fflush(stdout);
 #endif
@@ -360,11 +367,10 @@ inline oop ShenandoahHeap::try_evacuate_object(oop p, Thread* thread, Shenandoah
     // Successfully evacuated. Our copy is now the public one!
     shenandoah_assert_correct(NULL, copy_val);
 #ifdef TRACE_PROMOTION
-    if (target_gen == OLD_GENERATION) {
-      printf("young-gen object %llx promoted to old-gen %llx\n",
-             (unsigned long long) cast_from_oop<HeapWord *>(p), (unsigned long long) copy);
-      fflush(stdout);
-    }
+    printf("successfully copied %s object %llx to %s %llx\n",
+           source_region, (unsigned long long) cast_from_oop<HeapWord *>(p),
+           dest_region, (unsigned long long) copy);
+    fflush(stdout);
 #endif
 
     return copy_val;
@@ -382,11 +388,14 @@ inline oop ShenandoahHeap::try_evacuate_object(oop p, Thread* thread, Shenandoah
     // we have to keep the fwdptr initialized and pointing to our (stale) copy.
 
 #ifdef TRACE_PROMOTION
-      if (target_gen == OLD_GENERATION) {
-        printf("young-gen object %llx failed to promote to old-gen %llx; other thread won race!\n",
-               (unsigned long long) cast_from_oop<HeapWord *>(p), (unsigned long long) copy);
-        fflush(stdout);
-    }
+    ShenandoahHeapRegion* r = ShenandoahHeap::heap_region_containing(p);
+    const char *source_region = ((r->affiliation() == YOUNG_GENERATION)? "young"
+                                 : ((r->affiliation() == OLD_GENERATION)? "old": "free"));
+    const char *dest_region = (target_gen == OLD_GENERATION)? "old": "young";
+
+    printf("attempt to copy %s object %llx to %s %llx failed because another thread won race!\n",
+           source_region, (unsigned long long) cast_from_oop<HeapWord *>(p), dest_region, (unsigned long long) copy);
+    fflush(stdout);
 #endif
 
     if (alloc_from_gclab) {

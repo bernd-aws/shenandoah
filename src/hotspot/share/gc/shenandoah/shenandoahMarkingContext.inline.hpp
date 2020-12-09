@@ -27,6 +27,8 @@
 
 #include "gc/shenandoah/shenandoahMarkingContext.hpp"
 
+#undef DEBUG_TRACE
+
 inline MarkBitMap* ShenandoahMarkingContext::mark_bit_map() {
   return &_mark_bit_map;
 }
@@ -40,8 +42,50 @@ inline bool ShenandoahMarkingContext::is_marked(oop obj) const {
   return allocated_after_mark_start(obj) || _mark_bit_map.is_marked(obj);
 }
 
+#ifdef DEBUG_TRACE
+static const char *affiliationToString(ShenandoahRegionAffiliation a) {
+  static char buffer[32];
+  switch (a) {
+    case ShenandoahRegionAffiliation::YOUNG_GENERATION:
+      return "YOUNG_GENERATION";
+    case ShenandoahRegionAffiliation::OLD_GENERATION:
+      return "OLD_GENERATION";
+    case ShenandoahRegionAffiliation::FREE:
+      return "FREE";
+    default:
+      return "UNKNOWN_AFFILIATION";
+  }
+}
+#endif
+
 inline bool ShenandoahMarkingContext::is_marked_or_old(oop obj) const {
-  return is_marked(obj) || ShenandoahHeap::heap()->is_old(obj);
+#ifdef DEBUG_TRACE
+  static int invocation_count = 0;
+  int label = invocation_count++; // should be atomic increment, but
+                                  // race is rare and we'll decypher
+                                  // conflicts in output.
+  if (!is_marked(obj)) {
+    HeapWord* addr = cast_from_oop<HeapWord*>(obj);
+    ShenandoahHeap* heap = ShenandoahHeap::heap();
+    ShenandoahHeapRegion* r = heap->heap_region_containing(addr);
+    printf("%d: Checking: %llx is not marked\n",
+           label, (unsigned long long) addr);
+    printf("%d:  region is (%llx, %llx, %llx) with association %s\n",
+           label, (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end(),
+           affiliationToString(r->affiliation()));
+    printf("%d:  GC mode: %s\n",
+           label, (heap->is_gc_generation_young())? "young": "global");
+    fflush(stdout);
+  }
+#endif
+  bool result = is_marked(obj) || ShenandoahHeap::heap()->is_old(obj);
+#ifdef DEBUG_TRACE
+  if (!is_marked(obj)) {
+    printf("%d: returning %s\n", label, result? "true": "false");
+    fflush(stdout);
+  }
+#endif
+  return result;
 }
 
 inline bool ShenandoahMarkingContext::allocated_after_mark_start(oop obj) const {

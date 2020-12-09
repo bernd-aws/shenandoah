@@ -54,6 +54,8 @@
 #include "runtime/handles.inline.hpp"
 
 #undef DEBUG_TRACE
+#undef TRACE_MARKING
+#define START_TRACE_WITH_GC 8
 
 template<GenerationMode GENERATION, UpdateRefsMode UPDATE_REFS>
 class ShenandoahInitMarkRootsClosure : public OopClosure {
@@ -64,6 +66,12 @@ private:
 
   template <class T>
   inline void do_oop_work(T* p) {
+#ifdef TRACE_MARKING
+    if (GCId::current() >= START_TRACE_WITH_GC) {
+      printf("ShenInitMarkRootsClosure::do_oop_work(%llx)\n", (unsigned long long) (void *)(*p));
+      fflush(stdout);
+    }
+#endif
     ShenandoahConcurrentMark::mark_through_ref<T, GENERATION, UPDATE_REFS, NO_DEDUP>(p, _heap, _queue, _mark_context);
   }
 
@@ -96,6 +104,12 @@ private:
 
   template <class T>
   inline void do_oop_work(T* p) {
+#ifdef TRACE_MARKING
+    if (GCId::current() >= START_TRACE_WITH_GC) {
+      printf("ShenInitMarkOopsClosure::do_oop_work(%llx)\n", (unsigned long long) (void *)(*p));
+      fflush(stdout);
+    }
+#endif
     ShenandoahConcurrentMark::mark_through_ref<T, YOUNG, UPDATE_REFS, NO_DEDUP>(p, _heap, _queue, _mark_context);
   }
 
@@ -376,7 +390,19 @@ public:
 
       ShenandoahSATBBufferClosure<GENERATION> cl(q);
       SATBMarkQueueSet& satb_mq_set = ShenandoahBarrierSet::satb_mark_queue_set();
+#ifdef TRACE_MARKING
+      if (GCId::current() >= START_TRACE_WITH_GC) {
+        printf("in final marking, draining completed SATB buffers\n");
+        fflush(stdout);
+      }
+#endif
       while (satb_mq_set.apply_closure_to_completed_buffer(&cl));
+#ifdef TRACE_MARKING
+      if (GCId::current() >= START_TRACE_WITH_GC) {
+        printf("in final marking, done draining completed SATB buffers\n");
+        fflush(stdout);
+      }
+#endif
       bool do_nmethods = heap->unload_classes() && !ShenandoahConcurrentRoots::can_do_concurrent_class_unloading();
       if (heap->has_forwarded_objects()) {
         ShenandoahMarkResolveRefsClosure<GENERATION> resolve_mark_cl(q, rp);
@@ -386,6 +412,12 @@ public:
                                                                       do_nmethods ? &blobsCl : NULL);
         Threads::threads_do(&tc);
       } else {
+#ifdef TRACE_MARKING
+      if (GCId::current() >= START_TRACE_WITH_GC) {
+        printf("in final marking, looking at refs closure, code blob closures, SATB and code roots\n");
+        fflush(stdout);
+      }
+#endif
         ShenandoahMarkRefsClosure<GENERATION> mark_cl(q, rp);
         MarkingCodeBlobClosure blobsCl(&mark_cl, !CodeBlobToOopClosure::FixRelocations);
         ShenandoahSATBAndRemarkCodeRootsThreadsClosure<GENERATION> tc(&cl,
@@ -395,9 +427,22 @@ public:
       }
     }
 
+#ifdef TRACE_MARKING
+    if (GCId::current() >= START_TRACE_WITH_GC) {
+      printf("in final marking, iterating through the mark loop\n");
+      fflush(stdout);
+    }
+#endif
     _cm->mark_loop(worker_id, _terminator, rp,
                    false, // not cancellable
                    _dedup_string);
+
+#ifdef TRACE_MARKING
+    if (GCId::current() >= START_TRACE_WITH_GC) {
+      printf("in final marking, the mark loop is done\n");
+      fflush(stdout);
+    }
+#endif
 
     assert(_cm->task_queues()->is_empty(), "Should be empty");
   }

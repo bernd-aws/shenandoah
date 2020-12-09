@@ -503,11 +503,6 @@ void ShenandoahHeapRegion::recycle() {
 }
 
 HeapWord* ShenandoahHeapRegion::block_start(const void* p) const {
-#ifdef DEBUG_TRACE
-  printf("block_start(%llx) looking within region %llx - %llx (%llx): \n",
-         (unsigned long long) p, (unsigned long long) bottom(), (unsigned long long) top(), (unsigned long long) end());
-  fflush(stdout);
-#endif
   assert(MemRegion(bottom(), end()).contains(p),
          "p (" PTR_FORMAT ") not in space [" PTR_FORMAT ", " PTR_FORMAT ")",
          p2i(p), p2i(bottom()), p2i(end()));
@@ -517,19 +512,10 @@ HeapWord* ShenandoahHeapRegion::block_start(const void* p) const {
     HeapWord* last = bottom();
     HeapWord* cur = last;
     while (cur <= p) {
-#ifdef DEBUG_TRACE
-      printf("  block_start examining @%llx of byte size %llx\n",
-             (unsigned long long) cur, (unsigned long long) 8 * oop(cur)->size());
-      fflush(stdout);
-#endif
       last = cur;
       cur += oop(cur)->size();
     }
     shenandoah_assert_correct(NULL, oop(last));
-#ifdef DEBUG_TRACE
-    printf("block_start(%llx) returning %llx\n", (unsigned long long) p, (unsigned long long) last);
-    fflush(stdout);
-#endif
     return last;
   }
 }
