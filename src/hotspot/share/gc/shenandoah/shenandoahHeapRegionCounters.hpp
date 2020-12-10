@@ -61,7 +61,7 @@
 class ShenandoahHeapRegionCounters : public CHeapObj<mtGC>  {
 private:
   static const jlong PERCENT_MASK      = 0x7f;
-  static const jlong AGE_MASK          = 0x0f;
+  static const jlong AGE_MASK          = 0x1f;
   static const jlong AFFILIATION_MASK  = 0x03;
   static const jlong STATUS_MASK       = 0x3f;
 

@@ -86,6 +86,9 @@ void ShenandoahHeapRegionCounters::update() {
       if (heap->is_evacuation_in_progress())           status |= 1 << 1;
       if (heap->is_update_refs_in_progress())          status |= 1 << 2;
       if (heap->is_gc_generation_young())              status |= 1 << 3;
+      if (heap->is_degenerated_gc_in_progress())       status |= 1 << 4;
+      if (heap->is_full_gc_in_progress())              status |= 1 << 5;
+
       _status->set_value(status);
 
       _timestamp->set_value(os::elapsed_counter());

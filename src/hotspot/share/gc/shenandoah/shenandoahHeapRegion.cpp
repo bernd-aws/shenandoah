@@ -333,7 +333,7 @@ void ShenandoahHeapRegion::set_live_data(size_t s) {
   assert(Thread::current()->is_VM_thread(), "by VM thread");
   _live_data = (s >> LogHeapWordSize);
   if (_affiliation == FREE) {
-    assert(_live_data == 0, "Setting non-zero live data (%zu) on FREE region", s);
+    //assert(_live_data == 0, "Setting non-zero live data (%zu) on FREE region", s);
   }
 }
 
