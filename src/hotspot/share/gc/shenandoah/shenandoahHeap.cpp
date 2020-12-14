@@ -952,7 +952,7 @@ HeapWord* ShenandoahHeap::allocate_memory_under_lock(ShenandoahAllocRequest& req
   // a promoted region, or at least try to balance the efforts so that different gc threads work on registering the objects of
   // different heap regions.  But that effort will come later.
   //
-  if (req.affiliation() == ShenandoahRegionAffiliation::OLD_GENERATION) {
+  if (result != NULL && req.affiliation() == ShenandoahRegionAffiliation::OLD_GENERATION) {
     ShenandoahHeap::heap()->card_scan()->register_object(result, req.actual_size());
   }
   return result;
