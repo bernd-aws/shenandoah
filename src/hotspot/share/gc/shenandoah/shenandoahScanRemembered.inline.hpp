@@ -203,21 +203,27 @@ ShenandoahCardCluster<RememberedSet>::coalesce_objects(HeapWord* address, uint32
     //    or it returns an object that comes after the object immediately following the coalesced object.
   } else {
     uint32_t coalesced_offset = address - card_start_address;
-    if (get_last_start(card_at_start) > coalesced_offset)
+    if (get_last_start(card_at_start) > coalesced_offset) {
+      // Existing last start is being coalesced, create new last start
       set_last_start(card_at_start, coalesced_offset);
+    }
     // otherwise, get_last_start(card_at_start) must equal coalesced_offset
-    
-    for (uint32_t i = card_at_start + 1; i < card_at_end; i++)
+
+    // All the cards between first and last get cleared.
+    for (uint32_t i = card_at_start + 1; i < card_at_end; i++) {
       clear_has_object_bit(i);
-    
+    }
+
     uint32_t follow_offset = (address + length_in_words) - _rs->addr_for_card_index(card_at_end);
     if (has_object(card_at_end) && (get_first_start(card_at_end) < follow_offset)) {
       // It may be that after coalescing within this last card's memory range, the last card
       // no longer holds an object.
-      if (get_last_start(card_at_end) > follow_offset)
+      if (get_last_start(card_at_end) >= follow_offset) {
         set_first_start(card_at_end, follow_offset);
-      else                      // last_start must equal follow_offset
+      } else {
+        // last_start is being coalesced so this card no longer has any objects.
         clear_has_object_bit(card_at_end);
+      }
     }
     // else
     //  card_at_end did not have an object, so it still does not have an object, or
