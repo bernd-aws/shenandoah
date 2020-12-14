@@ -208,7 +208,7 @@ HeapWord* ShenandoahFreeSet::try_allocate_in(ShenandoahHeapRegion* r, Shenandoah
     fflush(stdout);
 #endif
     // This free region might have garbage in its remembered set representation.
-    ShenandoahHeap::heap()->card_scan()->mark_range_as_empty(r->bottom(), (uint32_t) (r->end() - r->bottom()));
+    _heap->clear_cards_for(r);
     r->set_affiliation(req.affiliation());
   } else if (r->affiliation() != req.affiliation()) {
     return NULL;

@@ -726,6 +726,7 @@ private:
 
 public:
   inline RememberedScanner* card_scan() { return _card_scan; }
+  void clear_cards_for(ShenandoahHeapRegion* region);
 
 // ---------- Helper functions
 //
