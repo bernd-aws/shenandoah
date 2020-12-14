@@ -919,7 +919,43 @@ HeapWord* ShenandoahHeap::allocate_memory(ShenandoahAllocRequest& req) {
 
 HeapWord* ShenandoahHeap::allocate_memory_under_lock(ShenandoahAllocRequest& req, bool& in_new_region) {
   ShenandoahHeapLocker locker(lock());
-  return _free_set->allocate(req, in_new_region);
+  HeapWord* result = _free_set->allocate(req, in_new_region);
+  // Register the newly allocated object while we're holding the global lock since there's no synchronization
+  // built in to the implementation of register_object().  There are potential races when multiple independent
+  // threads are allocating objects, some of which might span the same card region.  For example, consider
+  // a card table's memory region within which three objects are being allocated by three different threads:
+  //  
+  // objects being "concurrently" allocated:
+  //    [-----a------][-----b-----][--------------c------------------]
+  //            [---- card table memory range --------------]
+  //
+  // Before any objects are allocated, this card's memory range holds no objects.  Note that:
+  //   allocation of object a wants to set the has-object, first-start, and last-start attributes of the preceding card region.
+  //   allocation of object b wants to set the has-object, first-start, and last-start attributes of this card region.
+  //   allocation of object c also wants to set the has-object, first-start, and last-start attributes of this card region.
+  //
+  // The thread allocating b and the thread allocating c can "race" in various ways, resulting in confusion, such as last-start
+  // representing object b while first-start represents object c.  This is why we need to require all register_object()
+  // invocations to be "mutually exclusive".  Later, when we use GCLABs to allocate memory for promotions and evacuations,
+  // the protocol may work something like the following:
+  //   1. The GCLAB is allocated by this (or similar) function, while holding the global lock.
+  //   2. The GCLAB is registered as a single object.
+  ///  3. The GCLAB is always aligned at the start of a card memory range and is always a multiple of the card-table memory range size
+  //   3. Individual allocations carved from the GCLAB are not immediately registered
+  //   4. When the GCLAB is eventually retired, all of the objects allocated within the GCLAB are registered in batch by a
+  //      single thread.  No further synchronization is required because no other allocations will pertain to the same
+  //      card-table memory ranges.
+  //
+  // The other case that needs special handling is promotion of regions en masse.  When the region is promoted, all objects contained
+  // within the region are registered.  Since the region is a multiple of card-table memory range sizes, there is no need for
+  // synchronization.  It might be nice to figure out how to allow multiple threads to work together to register all of the objects in
+  // a promoted region, or at least try to balance the efforts so that different gc threads work on registering the objects of
+  // different heap regions.  But that effort will come later.
+  //
+  if (req.affiliation() == ShenandoahRegionAffiliation::OLD_GENERATION) {
+    ShenandoahHeap::heap()->card_scan()->register_object(result, req.actual_size());
+  }
+  return result;
 }
 
 HeapWord* ShenandoahHeap::mem_allocate(size_t size,
@@ -2451,7 +2487,7 @@ private:
             // Old region in a global cycle.
             // We need to make sure that the next cycle does not iterate over dead objects
             // which haven't had their references updated.
-            r->oop_iterate(&cl, /*fill_dead_objects*/ true);
+            r->oop_iterate(&cl, /*fill_dead_objects*/ true, /* reregister_coalesced_objects */ true);
           } else if (ShenandoahBarrierSet::barrier_set()->card_table()->is_dirty(MemRegion(r->bottom(), r->top()))) {
             // Old region in a young cycle.
             if (r->is_humongous()) {
@@ -2460,6 +2496,15 @@ private:
               // We don't have liveness information about this region.
               // Therefore we process all objects, rather than just marked ones.
               // Otherwise subsequent traversals will encounter stale pointers.
+
+              // HEY! kelvin thinks we don't have to update refs throughout the entire region r.  We only need
+              // to update refs for objects that span dirty cards.  The code in process clusters does that.  We cannot invoke process_clusters
+              // because that's designed to process transitive closure of live objects.  Here, we are just looking
+              // one level deep in each of the relevant regions.  But we can copy and paste some of the code from 
+              // there.
+
+              // HEY moreover!  Need to figure out how regions are partitioned between worker threads.  Is it possible
+              // that each region is being processed redundantly by each worker thread?
 
               HeapWord *p = r->bottom();
               ShenandoahObjectToOopBoundedClosure<T> objs(&cl, p, update_watermark);

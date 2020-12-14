@@ -278,10 +278,18 @@ void ShenandoahYoungGeneration::promote_all_regions() {
              (unsigned long long) r->bottom(), (unsigned long long) r->top(), (unsigned long long) r->end());
       fflush(stdout);
 #endif
+      // HEY! Promoting an object involves more than just setting its affiliation to OLD_GENERATION.  Don't
+      // we want to invoke r->promote()?
+
       r->set_affiliation(ShenandoahRegionAffiliation::OLD_GENERATION);
     }
   }
   assert(_affiliated_region_count == 0, "young generation must not have affiliated regions after reset");
   _used = 0;
+
+  // HEY! Better to use a service of ShenandoahScanRemembered for the following.
+
+  // HEY Furthermore! Don't understand when this is used.  But we probably have to do something to initialize the
+  // start_offsets[] array as well.
   ShenandoahBarrierSet::barrier_set()->card_table()->clear();
 }

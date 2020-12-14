@@ -81,15 +81,20 @@ public:
   ShenandoahBufferWithSATBRememberedSet(size_t card_count);
   ~ShenandoahBufferWithSATBRememberedSet();
 
+  size_t total_cards();
   uint32_t card_index_for_addr(HeapWord *p);
   HeapWord *addr_for_card_index(uint32_t card_index);
   bool is_card_dirty(uint32_t card_index);
   void mark_card_as_dirty(uint32_t card_index);
+  void mark_range_as_dirty(uint32_t card_index, uint32_t num_cards);
   void mark_card_as_clean(uint32_t card_index);
+  void mark_range_as_clean(uint32_t card_index, uint32_t num_cards);
   void mark_overreach_card_as_dirty(uint32_t card_index);
   bool is_card_dirty(HeapWord *p);
   void mark_card_as_dirty(HeapWord *p);
+  void mark_range_as_dirty(HeapWord *p, size_t num_heap_words);
   void mark_card_as_clean(HeapWord *p);
+  void mark_range_as_clean(HeapWord *p, size_t num_heap_words);
   void mark_overreach_card_as_dirty(void *p);
   uint32_t cluster_count();
 

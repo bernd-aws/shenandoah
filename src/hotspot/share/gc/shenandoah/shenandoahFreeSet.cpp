@@ -30,6 +30,7 @@
 #include "gc/shenandoah/shenandoahMarkingContext.inline.hpp"
 #include "gc/shenandoah/shenandoahYoungGeneration.hpp"
 #include "gc/shenandoah/shenandoahBarrierSet.hpp"
+#include "gc/shenandoah/shenandoahScanRemembered.inline.hpp"
 #include "logging/logStream.hpp"
 #include "runtime/orderAccess.hpp"
 
@@ -113,6 +114,11 @@ HeapWord* ShenandoahFreeSet::allocate_single(ShenandoahAllocRequest& req, bool& 
             if (r->is_old()) {
               // HEY! This is a very coarse card marking. We hope to repair
               // such cards during remembered set scanning.
+
+              // HEY! To support full generality with alternative remembered set implementations,
+              // is preferable to not make direct access to the current card_table implementation.
+              //  Try ShenandoahHeap::heap()->card_scan()->mark_range_as_dirty(result, req.actual_size());
+
               ShenandoahBarrierSet::barrier_set()->card_table()->dirty_MemRegion(MemRegion(result, req.actual_size()));
             }
             return result;
@@ -141,6 +147,11 @@ HeapWord* ShenandoahFreeSet::allocate_single(ShenandoahAllocRequest& req, bool& 
               if (r->is_old()) {
                 // HEY! This is a very coarse card marking. We hope to repair
                 // such cards during remembered set scanning.
+
+                // HEY! To support full generality with alternative remembered set implementations,
+                // is preferable to not make direct access to the current card_table implementation.
+                //  Try ShenandoahHeap::heap()->card_scan()->mark_range_as_dirty(result, req.actual_size());
+
                 ShenandoahBarrierSet::barrier_set()->card_table()->dirty_MemRegion(MemRegion(result, req.actual_size()));
               }
               return result;
@@ -196,6 +207,8 @@ HeapWord* ShenandoahFreeSet::try_allocate_in(ShenandoahHeapRegion* r, Shenandoah
            affiliation_name(req.affiliation()));
     fflush(stdout);
 #endif
+    // This free region might have garbage in its remembered set representation.
+    ShenandoahHeap::heap()->card_scan()->mark_range_as_empty(r->bottom(), (uint32_t) (r->end() - r->bottom()));
     r->set_affiliation(req.affiliation());
   } else if (r->affiliation() != req.affiliation()) {
     return NULL;

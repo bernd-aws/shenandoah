@@ -31,6 +31,7 @@
 #include "gc/shenandoah/shenandoahMarkingContext.inline.hpp"
 #include "gc/shenandoah/shenandoahGeneration.hpp"
 #include "gc/shenandoah/shenandoahYoungGeneration.hpp"
+#include "gc/shenandoah/shenandoahScanRemembered.inline.hpp"
 #include "gc/shared/space.inline.hpp"
 #include "jfr/jfrEvents.hpp"
 #include "memory/iterator.inline.hpp"
@@ -403,16 +404,20 @@ void ShenandoahHeapRegion::print_on(outputStream* st) const {
   st->cr();
 }
 
-void ShenandoahHeapRegion::oop_iterate(OopIterateClosure* blk, bool fill_dead_objects) {
+void ShenandoahHeapRegion::oop_iterate(OopIterateClosure* blk, bool fill_dead_objects, bool reregister_coalesced_objects) {
   if (!is_active()) return;
   if (is_humongous()) {
+    if (fill_dead_objects && !reregister_coalesced_objects) {
+     oop obj = oop(bottom());
+     ShenandoahHeap::heap()->card_scan()->register_object(bottom(), obj->size());
+    }
     oop_iterate_humongous(blk);
   } else {
-    oop_iterate_objects(blk, fill_dead_objects);
+    oop_iterate_objects(blk, fill_dead_objects, reregister_coalesced_objects);
   }
 }
 
-void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk, bool fill_dead_objects) {
+void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk, bool fill_dead_objects, bool reregister_coalesced_objects) {
   assert(!is_humongous(), "no humongous region here");
   HeapWord* obj_addr = bottom();
   HeapWord* t = top();
@@ -434,10 +439,17 @@ void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk, bool fill
       oop obj = oop(obj_addr);
       if (marking_context->is_marked(obj)) {
         if (fill_addr != NULL) {
+           if (reregister_coalesced_objects) { // change existing crossing map information
+            heap->card_scan()->coalesce_objects(fill_addr, fill_size);
+          } else {              // establish new crossing map information
+            heap->card_scan()->register_object(fill_addr, fill_size);
+          }
           ShenandoahHeap::fill_with_object(fill_addr, fill_size);
           fill_addr = NULL;
         }
         assert(obj->klass() != NULL, "klass should not be NULL");
+        if (!reregister_coalesced_objects)
+          heap->card_scan()->register_object(obj_addr, obj->size());
         obj_addr += obj->oop_iterate_size(blk);
       } else {
         int size = obj->size();
@@ -452,6 +464,11 @@ void ShenandoahHeapRegion::oop_iterate_objects(OopIterateClosure* blk, bool fill
     }
     if (fill_addr != NULL) {
       ShenandoahHeap::fill_with_object(fill_addr, fill_size);
+      if (reregister_coalesced_objects) { // change existing crossing map information
+        heap->card_scan()->coalesce_objects(fill_addr, fill_size);
+      } else {              // establish new crossing map information
+        heap->card_scan()->register_object(fill_addr, fill_size);
+      }
     }
   }
 }
@@ -805,9 +822,11 @@ void ShenandoahHeapRegion::promote() {
     assert(marking_context->is_marked(obj), "promoted humongous object should be alive");
 
     int index_limit = index() + ShenandoahHeapRegion::required_regions(obj->size() * HeapWordSize);
+    heap->card_scan()->register_object(bottom(), obj->size());
     for (int i = index(); i < index_limit; i++) {
       ShenandoahHeapRegion* r = heap->get_region(i);
       log_debug(gc)("promoting region %lu, clear cards from %lx to %lx", r->index(), (size_t) r->bottom(), (size_t) r->top());
+
       ShenandoahBarrierSet::barrier_set()->card_table()->clear_MemRegion(MemRegion(r->bottom(), r->end()));
 #ifdef DEBUG_TRACE
       printf("promoting humongous region (%llx, %llx, %llx), setting affiliation to OLD_GENERATION\n",
@@ -816,12 +835,17 @@ void ShenandoahHeapRegion::promote() {
 #endif
       r->set_affiliation(OLD_GENERATION);
     }
+    // HEY!  Better to call ShenandoahHeap::heap()->card_scan()->mark_range_as_clean(r->bottom(), obj->size())
+    //  and skip the calls to clear_MemRegion() above.
+
     // Iterate over all humongous regions that are spanned by the humongous object obj.  The remnant
     // of memory in the last humongous region that is not spanned by obj is currently not used.
     obj->oop_iterate(&update_card_values);
   } else {
     log_debug(gc)("promoting region %lu, clear cards from %lx to %lx", index(), (size_t) bottom(), (size_t) top());
     assert(!is_humongous_continuation(), "should not promote humongous object continuation in isolation");
+
+    // HEY!  Better to call ShenandoahHeap::heap()->card_scan()->mark_range_as_dirty(r->bottom(), obj->size());
     ShenandoahBarrierSet::barrier_set()->card_table()->clear_MemRegion(MemRegion(bottom(), end()));
 #ifdef DEBUG_TRACE
     printf("promoting normal region (%llx, %llx, %llx), setting affiliation to OLD_GENERATION\n",
@@ -829,7 +853,6 @@ void ShenandoahHeapRegion::promote() {
     fflush(stdout);
 #endif
     set_affiliation(OLD_GENERATION);
-
-    oop_iterate_objects(&update_card_values, /*fill_dead_objects*/ true);
+    oop_iterate_objects(&update_card_values, /*fill_dead_objects*/ true, /* reregister_coalesced_objects */ false);
   }
 }

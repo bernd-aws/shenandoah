@@ -114,33 +114,5 @@ void ShenandoahBufferWithSATBRememberedSet::merge_overreach(
     uint32_t first_cluster, uint32_t count) {
 }
 
-#ifdef IMPLEMENT_THIS_OPTIMIZATION_LATER
 
-template <class RememberedSet>
-bool ShenandoahCardCluster<RememberedSet>::has_object(uint32_t card_index) {
-  return (object_starts[card_index] & ObjectStartsInCardRegion)? true: false;
-}
-
-template <class RememberedSet>
-uint32_t ShenandoahCardCluster<RememberedSet>::get_first_start(uint32_t card_index)
-{
-  assert(object_starts[card_index] & ObjectStartsInCardRegion);
-  return (((object_starts[card_index] & FirstStartBits) >> FirstStartShift) *
-          CardWordOffsetMultiplier);
-}
-
-template <class RememberedSet>
-uint32_t ShenandoahCardCluster<RememberedSet>::get_last_start(uint32_t card_index) {
-  assert(object_starts[card_index] & ObjectStartsInCardRegion);
-  return (((object_starts[card_index] & LastStartBits) >> LastStartShift) *
-          CardWordOffsetMultiplier);
-}
-
-template <class RememberedSet>
-uint8_t ShenandoahCardCluster<RememberedSet>::get_crossing_object_start(uint32_t card_index) {
-  assert((object_starts[card_index] & ObjectStartsInCardRegion) == 0);
-  return object_starts[card_index] * CardWordOffsetMultiplier;
-}
-
-#endif
 
