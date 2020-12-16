@@ -137,6 +137,39 @@ void ShenandoahBarrierSetAssembler::arraycopy_prologue(MacroAssembler* masm, Dec
 
 }
 
+void ShenandoahBarrierSetAssembler::arraycopy_epilogue(MacroAssembler* masm, DecoratorSet decorators, BasicType type,
+                                                       Register src, Register dst, Register count) {
+  bool checkcast = (decorators & ARRAYCOPY_CHECKCAST) != 0;
+  bool disjoint = (decorators & ARRAYCOPY_DISJOINT) != 0;
+  bool obj_int = type == T_OBJECT LP64_ONLY(&& UseCompressedOops);
+#ifdef _LP64
+  Register tmp = rscratch1;
+#else
+  Register tmp = rax;
+#endif
+
+if (is_reference_type(type)) {
+#ifdef _LP64
+#if COMPILER2_OR_JVMCI
+    if (VM_Version::supports_avx512vlbw() && MaxVectorSize  >= 32 && !checkcast) {
+      if (!obj_int) {
+        // Save count for barrier
+        count = r11;
+      } else if (disjoint) {
+        // Use the saved dst in the disjoint case
+        dst = r11;
+      }
+    }
+#  endif
+#else
+    if (disjoint) {
+      __ mov(dst, rdx); // restore 'to'
+    }
+#endif
+    gen_write_ref_array_post_barrier(masm, decorators, dst, count, tmp);
+  }
+}
+
 void ShenandoahBarrierSetAssembler::shenandoah_write_barrier_pre(MacroAssembler* masm,
                                                                  Register obj,
                                                                  Register pre_val,
@@ -876,7 +909,6 @@ void ShenandoahBarrierSetAssembler::gen_write_ref_array_post_barrier(MacroAssemb
 
   __ testl(count, count);
   __ jcc(Assembler::zero, L_done); // zero count - nothing to do
-
 
 #ifdef _LP64
   __ leaq(end, Address(addr, count, TIMES_OOP, 0));  // end == addr+count*oop_size
